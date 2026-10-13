@@ -1,6 +1,10 @@
 # Sennheiser Control
 
-A small Windows tray app for the **Sennheiser MOMENTUM 4**:
+A small Windows tray app I slopped into existence in my free time to get a semblance of control of the
+**Sennheiser MOMENTUM 4** headphones under Windows, because Sennheiser didn't think anyone would use these with a
+computer or something.
+
+What it does:
 - battery level in the notification area, refreshed every minute (as Smart Control Plus does) and on every change
   the headset reports
 - noise control (Adaptive / Custom / Off) from a right-click menu
@@ -11,7 +15,8 @@ A small Windows tray app for the **Sennheiser MOMENTUM 4**:
   forget), and factory reset
 
 It talks to the headset directly over Bluetooth (GAIA v3 over RFCOMM). There is no phone and no cloud involved.
-Everything here was reverse-engineered from the official Smart Control app; see [`PROTOCOL.md`](PROTOCOL.md).
+Everything here was reverse-engineered from the official Smart Control and Smart Control Plus apps; see
+[`PROTOCOL.md`](PROTOCOL.md).
 
 > Unofficial. Not affiliated with or endorsed by Sennheiser or Sonova.
 > The name and the logo in `assets/sennheiser-logo.svg` (app icon) belong to Sennheiser and are used here for
@@ -20,7 +25,8 @@ Everything here was reverse-engineered from the official Smart Control app; see 
 ## Use
 
 1. Pair the MOMENTUM 4 with Windows (Settings → Bluetooth & devices) and connect it.
-2. Run `sennheiser-control.exe`. It finds the headset automatically and shows the battery in the tray.
+2. Download `sennheiser-control.exe` from [Releases](https://github.com/xndbogdan/sennheiser-control/releases)
+   (or build it, see below) and run it. It finds the headset automatically and shows the battery in the tray.
 3. Interact with the tray icon:
    - **Left-click:** show or hide the window.
    - **Right-click:** Adaptive / Custom / Off, the Custom level, wind reduction, EQ preset, bass boost,
