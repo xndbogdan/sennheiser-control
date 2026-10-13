@@ -1,0 +1,309 @@
+{
+    "$schema": "../../../../../lib/node-hooks/device-model.schema.json",
+    "protocol": "GAIAV3",
+    "product_name": "User EQ",
+    "productFeatureType": "EQUALIZER",
+    "version": 2,
+    "parameters": [],
+    "properties": [
+        {
+            "name": "UserEQ_GetConfiguration",
+            "Value": {
+                "container": "array",
+                "type": "number"
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "UserEQ_GetConfiguration",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1000"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "UserEQ_GetConfiguration_RSP",
+                    "parameter": [
+                        {
+                            "name": "bands",
+                            "description": "number of bands",
+                            "type": "UINT8",
+                            "repitive": false
+                        },
+                        {
+                            "name": "minRange",
+                            "description": "minimum gain",
+                            "type": "INT8",
+                            "repitive": false
+                        },
+                        {
+                            "name": "maxRange",
+                            "description": "maximum gain",
+                            "type": "INT8",
+                            "repitive": false
+                        },
+                        {
+                            "name": "selectablePreset",
+                            "description": "selectable preset (not implemented)",
+                            "type": "UINT8",
+                            "repitive": false
+                        },
+                        {
+                            "name": "userPresets",
+                            "description": "user presets (not implemented)",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1100",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1180"
+                    }
+                }
+            }
+        },
+        {
+            "name": "UserEQ_SetSliderGain",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "UserEQ_SetSliderGain",
+                    "parameter": [
+                        {
+                            "type": "UINT8",
+                            "name": "bandIndex",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "bandIndex"
+                        },
+                        {
+                            "type": "INT8",
+                            "name": "gain",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "gain in centibel"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1001"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "bandIndex",
+                        "type": "number"
+                    },
+                    {
+                        "name": "gain",
+                        "type": "number"
+                    }
+                ]
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "UserEQ_SetSliderGain_RSP",
+                    "parameter": [],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1101",
+                        "GAIA_notification_ID": "0x1082",
+                        "GAIA_error_ID": "0x1181"
+                    }
+                },
+                "Params": []
+            }
+        },
+        {
+            "name": "UserEQ_GetSliderGain",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "UserEQ_GetSliderGain",
+                    "parameter": [
+                        {
+                            "type": "UINT8",
+                            "name": "bandIndex",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "bandIndex"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1002"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "bandIndex",
+                        "type": "number"
+                    }
+                ]
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "UserEQ_GetSliderGain_RSP",
+                    "parameter": [
+                        {
+                            "type": "INT8",
+                            "name": "gain",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "gain in centibel"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1102",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1182"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "gain",
+                        "type": "number"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "UserEQ_GetSliderGain_Notification",
+            "Value": {
+                "type": "number",
+                "container": "array",
+                "size": 5
+            },
+            "Get": {
+                "Event": {
+                    "PI_command_name": "UserEQ_GetSliderGain_RSP_Notification",
+                    "parameter": [
+                        {
+                            "type": "INT8",
+                            "name": "gain",
+                            "position": 0,
+                            "repitive": true,
+                            "description": "gain in centibel"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0000",
+                        "GAIA_notification_ID": "0x1082",
+                        "GAIA_error_ID": "0x1182"
+                    }
+                }
+            }
+        },
+        {
+            "name": "User_EQ_SubMode",
+            "Value": {
+                "container": "plain",
+                "type": "number"
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "User_EQ_SetSubMode",
+                    "parameter": [
+                        {
+                            "name": "mode",
+                            "description": "submode (bitmask)",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1008"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "User_EQ_SetSubMode_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1108",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1188"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "User_EQ_GetSubMode",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1009"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "User_EQ_GetSubMode_RSP",
+                    "parameter": [
+                        {
+                            "name": "mode",
+                            "description": "submode (bitmask)",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1109",
+                        "GAIA_notification_ID": "0x1089",
+                        "GAIA_error_ID": "0x1189"
+                    }
+                },
+                "Event": {
+                    "PI_command_name": "User_EQ_GetSubMode_RSP",
+                    "parameter": [
+                        {
+                            "name": "mode",
+                            "description": "submode (bitmask)",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1109",
+                        "GAIA_notification_ID": "0x1089",
+                        "GAIA_error_ID": "0x1189"
+                    }
+                }
+            }
+        },
+        {
+            "name": "RegisterNotification_userEQ",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "Config_RegisterNotification_Sennheiser",
+                    "parameter": [
+                        {
+                            "name": "featureID",
+                            "description": "no description",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0007"
+                    }
+                },
+                "Additional_Values": [8],
+                "Params": []
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "Config_RegisterNotification_Sennheiser_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0107",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x0187"
+                    }
+                },
+                "Params": []
+            }
+        }
+    ]
+}

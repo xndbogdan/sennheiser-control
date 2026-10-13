@@ -1,0 +1,23 @@
+[workspace]
+resolver = "3"
+members = ["crates/protocol", "crates/bluetooth", "crates/engine", "app", "tools/hsctl"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+protocol = { path = "crates/protocol" }
+bluetooth = { path = "crates/bluetooth" }
+engine = { path = "crates/engine" }
+thiserror = "2"
+log = "0.4"
+crossbeam-channel = "0.5"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+opt-level = 3

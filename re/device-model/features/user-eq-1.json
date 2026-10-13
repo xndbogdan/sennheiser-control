@@ -1,0 +1,314 @@
+{
+    "$schema": "../../../../../lib/node-hooks/device-model.schema.json",
+    "protocol": "GAIAV3",
+    "product_name": "User EQ",
+    "productFeatureType": "EQUALIZER",
+    "version": 1,
+    "parameters": [],
+    "properties": [
+        {
+            "name": "Sound_CustomEQKnobX",
+            "Value": {
+                "type": "number",
+                "container": "plain"
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "Sound_SetCustomEQKnobValue",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Index",
+                            "position": 0,
+                            "repitive": false
+                        },
+                        {
+                            "type": "UINT16",
+                            "name": "Value",
+                            "position": 1,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1004"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_SetCustomEQKnobValue_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1104",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1184"
+                    }
+                },
+                "Additional_Values": [0, "Value"]
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "Sound_GetCustomEQKnobValue",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Index",
+                            "position": 0,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1005"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_GetCustomEQKnobValue_RSP",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Value",
+                            "position": 0,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1105",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1185"
+                    }
+                },
+                "Additional_Values": [0]
+            }
+        },
+        {
+            "name": "Sound_CustomEQKnobY",
+            "Value": {
+                "type": "number",
+                "container": "plain"
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "Sound_SetCustomEQKnobValue",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Index",
+                            "position": 0,
+                            "repitive": false
+                        },
+                        {
+                            "type": "UINT16",
+                            "name": "Value",
+                            "position": 1,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1004"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_SetCustomEQKnobValue_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1104",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1184"
+                    }
+                },
+                "Additional_Values": [1, "Value"]
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "Sound_GetCustomEQKnobValue",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Index",
+                            "position": 0,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1005"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_GetCustomEQKnobValue_RSP",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "Value",
+                            "position": 0,
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1105",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1185"
+                    }
+                },
+                "Additional_Values": [1]
+            }
+        },
+        {
+            "name": "Sound_SetCustomEQ",
+            "retry_count": 0,
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "EQ_UserParameterGroup_Set",
+                    "parameter": [
+                        {
+                            "type": "INT16",
+                            "name": "param",
+                            "position": 0,
+                            "repitive": true
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1002"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "data",
+                        "type": "number",
+                        "container": "array"
+                    }
+                ]
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "EQ_UserParameterGroup_SetRsp",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1182",
+                        "GAIA_command_ID": "0x1102"
+                    }
+                },
+                "Params": []
+            }
+        },
+        {
+            "name": "Sound_GetCustomEQ",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "EQ_UserParameterGroup_Get",
+                    "parameter": [
+                        {
+                            "type": "INT16",
+                            "name": "params",
+                            "position": 0,
+                            "repitive": true,
+                            "description": "the EQ params to query"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1003"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "data",
+                        "type": "number",
+                        "container": "array"
+                    }
+                ]
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "EQ_UserParameterGroup_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "INT16",
+                            "name": "data",
+                            "position": 0,
+                            "repitive": true,
+                            "description": "the EQ params queried"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1183",
+                        "GAIA_command_ID": "0x1103"
+                    }
+                },
+                "Params": [
+                    {
+                        "name": "data",
+                        "type": "number",
+                        "container": "array"
+                    }
+                ]
+            }
+        },
+        {
+            "name": "Sound_LevelShift",
+            "Value": {
+                "container": "plain",
+                "type": "number"
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "Sound_SetLevelShift",
+                    "parameter": [
+                        {
+                            "name": "shift",
+                            "description": "shift in centibel",
+                            "type": "INT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1006"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_SetLevelShift_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1106",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1186"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "Sound_GetLevelShift",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1007"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Sound_GetLevelShift_RSP",
+                    "parameter": [
+                        {
+                            "name": "shift",
+                            "description": "shift in centibel",
+                            "type": "INT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x1107",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x1187"
+                    }
+                }
+            }
+        }
+    ]
+}

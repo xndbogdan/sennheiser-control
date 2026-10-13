@@ -1,0 +1,95 @@
+{
+    "$schema": "../../../../../lib/node-hooks/device-model.schema.json",
+    "protocol": "GAIAV3",
+    "product_name": "AudioMode",
+    "productFeatureType": "AUDIO_MODE",
+    "version": 1,
+    "parameters": [],
+    "properties": [
+        {
+            "name": "AudioMode",
+            "Value": {
+                "type": "string",
+                "mapped_type": "number",
+                "container": "map",
+                "map": {
+                    "USEREQ": 1,
+                    "SPEECHMODE": 2,
+                    "FLAT": 3
+                }
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "Control_SetCompressorMode",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "audiomode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "audiomode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0803"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Control_SetCompressorMode_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0903",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x0983"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "Control_GetCompressorMode",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0804"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "Control_GetCompressorMode_RSP",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "audiomode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "audiomode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0904",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x0984"
+                    }
+                },
+                "Event": {
+                    "PI_command_name": "Control_GetCompressorMode_RSP",
+                    "parameter": [
+                        {
+                            "type": "UINT16",
+                            "name": "audiomode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "audiomode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0904",
+                        "GAIA_notification_ID": "0x0884",
+                        "GAIA_error_ID": "0x0984"
+                    }
+                }
+            }
+        }
+    ]
+}

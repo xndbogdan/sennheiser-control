@@ -1,0 +1,557 @@
+{
+    "$schema": "../../../../../lib/node-hooks/device-model.schema.json",
+    "protocol": "GAIAV3",
+    "product_name": "Sound Personalization",
+    "productFeatureType": "SOUND_PERSONALIZATION",
+    "version": 1,
+    "parameters": [],
+    "properties": [
+        {
+            "name": "PersonalizedSound_Mode",
+            "Value": {
+                "type": "string",
+                "mapped_type": "number",
+                "container": "map",
+                "map": {
+                    "not_parameterized": 0,
+                    "disabled": 1,
+                    "standby": 2,
+                    "enabled": 3,
+                    "calibrating": 4
+                }
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Mode_Set",
+                    "parameter": [
+                        {
+                            "type": "UINT8",
+                            "name": "mode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "mode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2000"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Mode_SetRsp",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2100",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2180"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Mode_Get",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2001"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Mode_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "UINT8",
+                            "name": "mode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "mode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2101",
+                        "GAIA_notification_ID": "0x2081",
+                        "GAIA_error_ID": "0x2181"
+                    }
+                },
+                "Event": {
+                    "PI_command_name": "PersonalizedSound_Mode_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "UINT8",
+                            "name": "mode",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "mode"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2101",
+                        "GAIA_notification_ID": "0x2081",
+                        "GAIA_error_ID": "0x2181"
+                    }
+                }
+            }
+        },
+        {
+            "name": "PersonalizedSound_Threshold",
+            "Value": {
+                "type": "number",
+                "container": "array",
+                "size": 6
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Threshold_Set",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "threshold 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "threshold 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "threshold 3"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 4",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "threshold 4"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 5",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "threshold 5"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 6",
+                            "position": 5,
+                            "repitive": false,
+                            "description": "threshold 6"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2002"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Threshold_SetRsp",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2102",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2182"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Threshold_Get",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2003"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Threshold_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "threshold 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "threshold 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "threshold 3"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 4",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "threshold 4"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 5",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "threshold 5"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "threshold 6",
+                            "position": 5,
+                            "repitive": false,
+                            "description": "threshold 6"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2103",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2183"
+                    }
+                }
+            }
+        },
+        {
+            "name": "PersonalizedSound_Ratio",
+            "Value": {
+                "type": "number",
+                "container": "array",
+                "size": 6
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Ratio_Set",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "ratio 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "ratio 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "ratio 3"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 4",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "ratio 4"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 5",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "ratio 5"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 6",
+                            "position": 5,
+                            "repitive": false,
+                            "description": "ratio 6"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2004"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Ratio_SetRsp",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2104",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2184"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Ratio_Get",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2005"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Ratio_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "ratio 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "ratio 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "ratio 3"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 4",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "ratio 4"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 5",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "ratio 5"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "ratio 6",
+                            "position": 5,
+                            "repitive": false,
+                            "description": "ratio 6"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2105",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2185"
+                    }
+                }
+            }
+        },
+        {
+            "name": "PersonalizedSound_Gains",
+            "Value": {
+                "type": "number",
+                "container": "array",
+                "size": 5
+            },
+            "Set": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Gains_Set",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "gain 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "gain 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "gain 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "gain 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "gain 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "gain 3"
+                        },
+                        {
+                            "type": "UINT8",
+                            "name": "preset x",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "preset x"
+                        },
+                        {
+                            "type": "UINT8",
+                            "name": "preset y",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "preset y"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2006"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Gains_SetRsp",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2106",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2186"
+                    }
+                }
+            },
+            "Get": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Gains_Get",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2007"
+                    }
+                },
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Gains_GetRsp",
+                    "parameter": [
+                        {
+                            "type": "REAL32",
+                            "name": "gain 1",
+                            "position": 0,
+                            "repitive": false,
+                            "description": "gain 1"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "gain 2",
+                            "position": 1,
+                            "repitive": false,
+                            "description": "gain 2"
+                        },
+                        {
+                            "type": "REAL32",
+                            "name": "gain 3",
+                            "position": 2,
+                            "repitive": false,
+                            "description": "gain 3"
+                        },
+                        {
+                            "type": "UINT8",
+                            "name": "preset x",
+                            "position": 3,
+                            "repitive": false,
+                            "description": "preset x"
+                        },
+                        {
+                            "type": "UINT8",
+                            "name": "preset y",
+                            "position": 4,
+                            "repitive": false,
+                            "description": "preset y"
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2107",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2187"
+                    }
+                }
+            }
+        },
+        {
+            "name": "PersonalizedSound_Timeout",
+            "Value": {
+                "type": "number",
+                "container": "plain"
+            },
+            "Get": {
+                "Event": {
+                    "PI_command_name": "PersonalizedSound_Timeout_RSP",
+                    "parameter": [],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0000",
+                        "GAIA_notification_ID": "0x2088",
+                        "GAIA_error_ID": "0x0000"
+                    }
+                }
+            }
+        },
+        {
+            "name": "PersonalizedSound_Reset",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "PersonalizedSound_Reset",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2009"
+                    }
+                },
+                "Params": []
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "PersonalizedSound_Reset_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x2109",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x2189"
+                    }
+                },
+                "Params": []
+            }
+        },
+        {
+            "name": "RegisterNotification_Personalized_Sound",
+            "Invocation": {
+                "Command": {
+                    "PI_command_name": "Config_RegisterNotification_Sennheiser",
+                    "parameter": [
+                        {
+                            "name": "featureID",
+                            "description": "no description",
+                            "type": "UINT8",
+                            "repitive": false
+                        }
+                    ],
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0007"
+                    }
+                },
+                "Additional_Values": [16],
+                "Params": []
+            },
+            "Result": {
+                "Response": {
+                    "PI_command_name": "Config_RegisterNotification_Sennheiser_RSP",
+                    "gaiaV3": {
+                        "vendor_ID": "0x0495",
+                        "GAIA_command_ID": "0x0107",
+                        "GAIA_notification_ID": "0x0000",
+                        "GAIA_error_ID": "0x0187"
+                    }
+                },
+                "Params": []
+            }
+        }
+    ]
+}

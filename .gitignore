@@ -1,0 +1,13 @@
+/target
+
+# downloaded / extracted app packages
+*.apk
+*.xapk
+*.bin
+
+# Sennheiser's decompiled app code stays local (regenerate it as PROTOCOL.md §0 describes)
+/re/app-js/
+/re/tools/eq_gen1_vectors.mjs
+
+# preview sheets written by `--render-icons assets` (app.ico is kept)
+/assets/*.png
