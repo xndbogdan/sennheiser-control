@@ -323,6 +323,8 @@ impl HeadsetApp {
             let wind_sel = h
                 .anti_wind
                 .and_then(|a| WIND_ORDER.iter().position(|x| *x == a));
+            // part of noise cancelling: nothing to reduce while noise control is Off
+            let anc_running = mode != Some(NoiseMode::Off);
             stacked_row(ui, &p, ph::WIND, "Wind noise reduction", None, |ui| {
                 if let Some(i) = w::segmented(
                     ui,
@@ -330,12 +332,15 @@ impl HeadsetApp {
                     "wind",
                     &WIND_ORDER.map(|w| w.label()),
                     wind_sel,
-                    h.anti_wind.is_some(),
+                    h.anti_wind.is_some() && anc_running,
                     30.0,
                 ) {
                     self.act(Action::SetAntiWind(WIND_ORDER[i]));
                 }
             });
+            if !anc_running {
+                hint(ui, &p, "Works with Adaptive and Custom.");
+            }
         });
     }
 
@@ -550,6 +555,13 @@ impl HeadsetApp {
             ui.add_space(4.0);
 
             let edit = super::eq::editor(ui, &p, &mut bands, h.eq.min_db, h.eq.max_db, enabled);
+            if enabled {
+                ui.label(
+                    RichText::new("Drag points · Shift for fine steps")
+                        .font(regular(11.5))
+                        .color(p.text_faint),
+                );
+            }
             if edit.changed || edit.released {
                 self.eq_bands = Some(Pending {
                     value: bands,
@@ -573,79 +585,82 @@ impl HeadsetApp {
                 );
             }
 
+            // bass boost is part of the headset's user EQ, so it can't apply on Neutral (EQ off)
+            let neutral = choice == Some(EqChoice::Neutral);
+            let bass_enabled = enabled && !neutral;
             let mut bass = h.eq.bass_boost && h.eq_active();
             setting_row(
                 ui,
                 &p,
                 ph::SPEAKER_SIMPLE_HIGH,
                 "Bass boost",
-                None,
-                enabled,
+                if podcast {
+                    Some("Paused in podcast mode")
+                } else if neutral {
+                    Some("Pick a preset or Custom to use it")
+                } else {
+                    None
+                },
+                bass_enabled,
                 |ui| {
-                    if toggle(ui, &p, &mut bass, enabled).changed() {
+                    if toggle(ui, &p, &mut bass, bass_enabled).changed() {
                         self.act(Action::SetBassBoost(bass));
                     }
                 },
             );
 
-            ui.horizontal(|ui| {
-                if let Some(name) = &mut self.new_preset_name {
-                    let resp = ui.add(
-                        egui::TextEdit::singleline(name)
-                            .hint_text("Preset name")
-                            .desired_width(ui.available_width() - 150.0)
-                            .font(regular(13.0)),
-                    );
-                    resp.request_focus();
-                    let save = w::ghost_button(ui, &p, Some(ph::CHECK), "Save").clicked()
-                        || (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
-                    let cancel = w::ghost_button(ui, &p, None, "Cancel").clicked()
-                        || ui.input(|i| i.key_pressed(egui::Key::Escape));
-                    if save && !name.trim().is_empty() {
-                        let preset = CustomPreset {
-                            name: name.trim().chars().take(24).collect(),
-                            bands,
-                        };
-                        self.shared.update_settings(|s| {
-                            s.custom_presets.retain(|c| c.name != preset.name);
-                            s.custom_presets.push(preset);
-                        });
-                        self.new_preset_name = None;
-                    } else if cancel {
-                        self.new_preset_name = None;
-                    }
-                } else {
-                    if choice == Some(EqChoice::Custom)
-                        && enabled
-                        && w::ghost_button(ui, &p, Some(ph::ARROW_COUNTER_CLOCKWISE), "Flatten")
-                            .on_hover_text("Set every band of the Custom curve to 0 dB")
-                            .clicked()
-                    {
-                        let flat = [0.0; protocol::eq::BANDS];
-                        self.eq_bands = Some(Pending {
-                            value: flat,
-                            since: Instant::now(),
-                            dragging: false,
-                        });
-                        self.act(Action::SetEqBands(flat));
-                        self.shared.update_settings(|s| s.custom_eq = Some(flat));
-                    }
-                    if choice == Some(EqChoice::Custom)
-                        && enabled
-                        && w::ghost_button(ui, &p, Some(ph::FLOPPY_DISK), "Save as preset")
-                            .clicked()
-                    {
-                        self.new_preset_name = Some(String::new());
-                    }
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        ui.label(
-                            RichText::new("Drag points · Shift for fine steps")
-                                .font(regular(11.5))
-                                .color(p.text_faint),
+            let custom_tools = choice == Some(EqChoice::Custom) && enabled;
+            if custom_tools || self.new_preset_name.is_some() {
+                ui.horizontal(|ui| {
+                    if let Some(name) = &mut self.new_preset_name {
+                        let resp = ui.add(
+                            egui::TextEdit::singleline(name)
+                                .hint_text("Preset name")
+                                .desired_width(ui.available_width() - 150.0)
+                                .font(regular(13.0)),
                         );
-                    });
-                }
-            });
+                        resp.request_focus();
+                        let save = w::ghost_button(ui, &p, Some(ph::CHECK), "Save").clicked()
+                            || (resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+                        let cancel = w::ghost_button(ui, &p, None, "Cancel").clicked()
+                            || ui.input(|i| i.key_pressed(egui::Key::Escape));
+                        if save && !name.trim().is_empty() {
+                            let preset = CustomPreset {
+                                name: name.trim().chars().take(24).collect(),
+                                bands,
+                            };
+                            self.shared.update_settings(|s| {
+                                s.custom_presets.retain(|c| c.name != preset.name);
+                                s.custom_presets.push(preset);
+                            });
+                            self.new_preset_name = None;
+                        } else if cancel {
+                            self.new_preset_name = None;
+                        }
+                    } else {
+                        if custom_tools
+                            && w::ghost_button(ui, &p, Some(ph::ARROW_COUNTER_CLOCKWISE), "Flatten")
+                                .on_hover_text("Set every band of the Custom curve to 0 dB")
+                                .clicked()
+                        {
+                            let flat = [0.0; protocol::eq::BANDS];
+                            self.eq_bands = Some(Pending {
+                                value: flat,
+                                since: Instant::now(),
+                                dragging: false,
+                            });
+                            self.act(Action::SetEqBands(flat));
+                            self.shared.update_settings(|s| s.custom_eq = Some(flat));
+                        }
+                        if custom_tools
+                            && w::ghost_button(ui, &p, Some(ph::FLOPPY_DISK), "Save as preset")
+                                .clicked()
+                        {
+                            self.new_preset_name = Some(String::new());
+                        }
+                    }
+                });
+            }
             if h.caps.sound_personalization || h.caps.hi_res_audio {
                 w::divider(ui, &p);
             }

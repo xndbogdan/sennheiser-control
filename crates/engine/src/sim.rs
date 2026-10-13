@@ -37,6 +37,10 @@ const NOTIFIABLE: &[u16] = &[
     sn::PDL_CONNECTION_STATUS_GET,
 ];
 
+fn sim_custom_eq() -> bool {
+    std::env::var("HC_SIM_EQ").is_ok_and(|v| v == "custom")
+}
+
 /// Simulated paired-device list: (name, connected). "This PC" is the entry named [`SIM_OWN_HOST`].
 const SIM_HOSTS: [(&str, bool); 3] = [("Pixel 9", true), (SIM_OWN_HOST, true), ("iPad", false)];
 const SIM_OWN_HOST: &str = "Windows PC (simulated host)";
@@ -107,7 +111,8 @@ impl SimHeadset {
         p.insert(sn::SIDETONE_GET, prop(Some(sn::SIDETONE_SET), &[2], 4));
         p.insert(
             sn::AUDIO_MODE_GET,
-            prop(Some(sn::AUDIO_MODE_SET), &[0, 0], 5),
+            // HC_SIM_EQ=custom starts with the user EQ on and a curve that matches no preset
+            prop(Some(sn::AUDIO_MODE_SET), &[0, u8::from(sim_custom_eq())], 5),
         );
         p.insert(
             sn::PROMPT_MODE_GET,
@@ -145,7 +150,11 @@ impl SimHeadset {
         p.insert(sn::PDL_MAX_CONNECTIONS_GET, prop(None, &[2], 0));
         Self {
             props: Mutex::new(p),
-            sliders: Mutex::new([35, 20, -15, 15, 30]),
+            sliders: Mutex::new(if sim_custom_eq() {
+                [20, 5, -10, 10, 25]
+            } else {
+                [35, 20, -15, 15, 30]
+            }),
             hosts: Mutex::new(SIM_HOSTS.to_vec()),
             registered: Mutex::new(HashSet::new()),
             deframer: Mutex::new(Deframer::new()),

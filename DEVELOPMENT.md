@@ -40,6 +40,7 @@ assets/           app.ico (generated) and the logo SVG it is drawn from
 - `HC_SIM_BATTERY=12`: initial battery level for `--sim`
 - `HC_SIM_DEVICES=2`: number of simulated headsets
 - `HC_SIM_NOISE=custom|off`: start the simulated headset in that noise mode
+- `HC_SIM_EQ=custom`: start the simulated headset with the user EQ on and a curve that matches no preset
 - `HC_DEV_HEIGHT=1600`: initial window height
 - `HC_DEV_PAGE=settings|devices|panels`: open the settings page, the expanded headset switcher, or every
   collapsible panel and confirmation

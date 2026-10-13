@@ -26,7 +26,11 @@ fn item(id: &str, text: &str, enabled: bool) -> MenuItem {
 }
 
 fn submenu(text: &str, items: &[&dyn IsMenuItem]) -> Submenu {
-    let s = Submenu::new(esc(text), true);
+    submenu_enabled(text, items, true)
+}
+
+fn submenu_enabled(text: &str, items: &[&dyn IsMenuItem], enabled: bool) -> Submenu {
+    let s = Submenu::new(esc(text), enabled);
     for i in items {
         let _ = s.append(*i);
     }
@@ -121,7 +125,12 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
             })
             .collect();
         let refs: Vec<&dyn IsMenuItem> = winds.iter().map(|i| i as &dyn IsMenuItem).collect();
-        let _ = menu.append(&submenu("Wind noise reduction", &refs));
+        // part of noise cancelling: unavailable while noise control is Off
+        let _ = menu.append(&submenu_enabled(
+            "Wind noise reduction",
+            &refs,
+            mode != Some(NoiseMode::Off),
+        ));
         let _ = menu.append(&PredefinedMenuItem::separator());
 
         // sound
@@ -150,11 +159,15 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
                 Some(c) => format!("EQ preset ({})", c.label()),
                 None => "EQ preset".to_string(),
             };
-            let _ = menu.append(&submenu(&title, &refs));
-            let _ = menu.append(&check(
+            // podcast mode replaces the EQ, like in the window
+            let _ = menu.append(&submenu_enabled(&title, &refs, !h.podcast()));
+            // bass boost is part of the user EQ: not on Neutral (EQ off) or in podcast mode
+            let _ = menu.append(&CheckMenuItem::with_id(
                 "bass",
                 "Bass boost",
+                h.eq_active(),
                 h.eq.bass_boost && h.eq_active(),
+                None,
             ));
         }
         let _ = menu.append(&check("podcast", "Podcast mode", h.podcast()));
@@ -543,6 +556,10 @@ mod tests {
         assert!(!find("PC (this PC)").3 && find("PC (this PC)").4);
         assert!(find("Phone").3 && !find("Phone").4);
         assert!(tooltip(&state).ends_with("Custom (noise cancelling 50%)"));
+        // the EQ is off (Neutral), so bass boost can't apply; wind reduction works in Custom
+        assert!(find("EQ preset (Neutral)").3);
+        assert!(!find("Bass boost").3);
+        assert!(find("Wind noise reduction").3);
         for (_, id, text, _, _) in &items {
             if id.is_empty() {
                 continue;
