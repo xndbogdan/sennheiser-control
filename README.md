@@ -14,6 +14,10 @@ It talks to the headphones directly over Bluetooth. No phone, no account, no clo
 - Pretty much everything else the Smart Control Plus app does for the M4: Hi-Res, call settings, on-head
   detection, touch lock, auto power-off, prompts, multipoint, factory reset
 
+Enough of it works to keep me satisfied, and I didn't care to investigate anything beyond that. If you find
+something that doesn't work, [open an issue](https://github.com/xndbogdan/sennheiser-control/issues) and complain
+there.
+
 ## Getting started
 
 1. Pair the MOMENTUM 4 with Windows and connect it.
