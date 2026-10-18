@@ -213,7 +213,10 @@ impl HeadsetApp {
                                 }
                                 if let Some(sr) = h.sample_rate {
                                     let khz = sr as f32 / 1000.0;
-                                    let text = if khz.fract() == 0.0 {
+                                    // The headset reports 0 while nothing is playing.
+                                    let text = if sr == 0 {
+                                        "Idle".to_owned()
+                                    } else if khz.fract() == 0.0 {
                                         format!("{khz:.0} kHz")
                                     } else {
                                         format!("{khz:.1} kHz")
