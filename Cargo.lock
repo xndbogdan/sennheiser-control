@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "app"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ab_glyph",
  "crossbeam-channel",
@@ -543,7 +543,7 @@ dependencies = [
 
 [[package]]
 name = "bluetooth"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "crossbeam-channel",
  "log",
@@ -1069,7 +1069,7 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 
 [[package]]
 name = "engine"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bluetooth",
  "crossbeam-channel",
@@ -1777,7 +1777,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hsctl"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bluetooth",
  "crossbeam-channel",
@@ -2835,7 +2835,7 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
 name = "protocol"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
