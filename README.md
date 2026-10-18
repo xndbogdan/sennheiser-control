@@ -6,6 +6,8 @@ computer or something.
 
 It talks to the headphones directly over Bluetooth. No phone, no account, no cloud.
 
+![The main window](screenshots/main-window.jpeg)
+
 ## What it does
 
 - Battery level in the tray
@@ -25,6 +27,8 @@ there.
    run it. There's no installer. Windows will grumble because it isn't signed: *More info → Run anyway*.
 3. Left-click the tray icon for the window, right-click for the quick menu. Closing the window keeps the app in
    the tray; *Quit* is in the menu. Want it at login? Tray menu → *Start with Windows*.
+
+   ![The tray menu](screenshots/tray-menu.png)
 
 ## Good to know
 
