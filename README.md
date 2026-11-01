@@ -22,8 +22,9 @@ there.
 
 ## In the browser
 
-There's also a web version in [`web/`](web/README.md): same controls, no install, over Bluetooth from Chrome or Edge
-on desktop (Windows, macOS, Linux). It runs the exact same protocol code as the tray app, compiled to WebAssembly, and
+There's also a web version at **[sennheiser-control.vercel.app](https://sennheiser-control.vercel.app/)**: same
+controls, no install, over Bluetooth from Chrome or Edge on desktop (Windows, macOS, Linux). Its code is in
+[`web/`](web/README.md). It runs the exact same protocol code as the tray app, compiled to WebAssembly, and
 has a demo mode with a simulated headset. What it can't do is live in the tray: it only works while the tab is open.
 
 ## Other Sennheiser headphones (experimental)

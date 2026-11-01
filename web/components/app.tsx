@@ -1,15 +1,15 @@
 "use client";
 
 import {
-  ArrowSquareOut,
   BatteryWarning,
   Bluetooth,
+  DownloadSimple,
   EarSlash,
   Ear,
   Equalizer,
-  GithubLogo,
   Headphones,
   HandTap,
+  Heart,
   Lightning,
   LockSimple,
   Microphone,
@@ -107,16 +107,19 @@ function TopBar({ demo }: { demo: boolean }) {
 
 function Footer() {
   return (
-    <footer className="text-faint mt-10 flex flex-col items-center gap-2 text-center text-xs">
-      <div className="flex items-center gap-4">
-        <a href={`${REPO}/releases/latest`} className="hover:text-foreground inline-flex items-center gap-1">
-          Windows tray app <ArrowSquareOut size={12} />
+    <footer className="mt-10 flex flex-col items-center gap-3 text-center">
+      <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
+        <a href={REPO} className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors">
+          <DownloadSimple size={16} /> Download desktop app
         </a>
-        <a href={REPO} className="hover:text-foreground inline-flex items-center gap-1">
-          <GithubLogo size={13} /> Source
+        <a
+          href="https://www.himthe.dev/"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
+        >
+          <Heart size={16} /> Made by Bobee
         </a>
       </div>
-      <p>Not affiliated with or endorsed by Sennheiser or Sonova.</p>
+      <p className="text-faint text-xs">Not affiliated with or endorsed by Sennheiser or Sonova.</p>
     </footer>
   );
 }
