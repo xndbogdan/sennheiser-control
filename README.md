@@ -68,6 +68,19 @@ MOMENTUM 3, PXC 550, HD 450BT or the first two MOMENTUM True Wireless, which use
 Building, flags and code layout are in [`DEVELOPMENT.md`](DEVELOPMENT.md). How the headset protocol works (all
 reverse-engineered from Sennheiser's apps) is in [`PROTOCOL.md`](PROTOCOL.md).
 
+## Contributing
+
+Found a bug, want a feature, or have anything else in mind? Just open a pull request and I'll look it over.
+
+A few things that make that easier:
+
+- Headset behaviour lives in the Rust crates (`crates/protocol`, `crates/headset`) and is shared by the tray app and
+  the web version, so a fix there lands in both. If you change it, run `pnpm core` in `web/` and commit the rebuilt
+  `web/lib/core/` too.
+- Run `cargo test --workspace` (and `pnpm lint && pnpm build` in `web/` if you touched it) before opening the PR.
+- New write commands should come from Sennheiser's own apps (see [`PROTOCOL.md`](PROTOCOL.md)), not from guessing:
+  a wrong write goes to someone's real headphones.
+
 ---
 
 Unofficial, not affiliated with Sennheiser. For my personal use and pleasure, uses the Sennheiser logo because it
