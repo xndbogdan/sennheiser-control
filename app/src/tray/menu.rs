@@ -1,13 +1,13 @@
 //! Tray right-click menu: built from the current state, ids are parsed back into actions.
 
 use engine::{Action, AppState, LinkState, NoiseMode};
-use protocol::{AntiWind, PromptMode, eq::PRESETS};
+use protocol::{AntiWind, PromptMode};
 use tray_icon::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 
 use crate::settings::Settings;
 use crate::shared::{
-    COMFORT_CALLS_TITLE, PROMPTS_TITLE, SIDETONE_LABELS, SIDETONE_TITLE, Shared, UiCmd, WIND_ORDER,
-    custom_level_label,
+    COMFORT_CALLS_TITLE, PROMPTS_TITLE, SIDETONE_TITLE, Shared, UiCmd, WIND_ORDER,
+    custom_level_label, sidetone_labels,
 };
 
 /// Custom-mode balance shortcuts (0 = full noise cancelling, 50 = neutral, 100 = full transparency).
@@ -84,10 +84,7 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
 
     if let Some(h) = state.live() {
         let mode = h.noise_mode();
-        let mut modes = vec![NoiseMode::Adaptive, NoiseMode::Custom];
-        if h.caps.anc_off {
-            modes.push(NoiseMode::Off);
-        }
+        let modes = h.noise_modes();
         let items: Vec<CheckMenuItem> = modes
             .iter()
             .map(|m| {
@@ -101,51 +98,74 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
         for i in &items {
             let _ = menu.append(i);
         }
-        let custom = mode == Some(NoiseMode::Custom);
-        let levels: Vec<CheckMenuItem> = CUSTOM_LEVELS
-            .iter()
-            .map(|l| {
-                check(
-                    &format!("level:{l}"),
-                    &custom_level_label(*l),
-                    custom && h.transparency == Some(*l),
-                )
-            })
-            .collect();
-        let refs: Vec<&dyn IsMenuItem> = levels.iter().map(|i| i as &dyn IsMenuItem).collect();
-        let _ = menu.append(&submenu("Custom level", &refs));
-        let winds: Vec<CheckMenuItem> = WIND_ORDER
-            .iter()
-            .map(|w| {
-                check(
-                    &format!("wind:{}", w.to_u8()),
-                    w.label(),
-                    h.anti_wind == Some(*w),
-                )
-            })
-            .collect();
-        let refs: Vec<&dyn IsMenuItem> = winds.iter().map(|i| i as &dyn IsMenuItem).collect();
-        // part of noise cancelling: unavailable while noise control is Off
-        let _ = menu.append(&submenu_enabled(
-            "Wind noise reduction",
-            &refs,
-            mode != Some(NoiseMode::Off),
-        ));
-        let _ = menu.append(&PredefinedMenuItem::separator());
+        let c = &h.caps;
+        if modes.contains(&NoiseMode::Custom) {
+            let custom = mode == Some(NoiseMode::Custom);
+            let levels: Vec<CheckMenuItem> = CUSTOM_LEVELS
+                .iter()
+                .map(|l| {
+                    check(
+                        &format!("level:{l}"),
+                        &custom_level_label(*l),
+                        custom && h.transparency == Some(*l),
+                    )
+                })
+                .collect();
+            let refs: Vec<&dyn IsMenuItem> = levels.iter().map(|i| i as &dyn IsMenuItem).collect();
+            let _ = menu.append(&submenu("Custom level", &refs));
+        }
+        if c.transparency_switch {
+            let _ = menu.append(&check(
+                "transparency",
+                "Transparent hearing",
+                h.transparent_hearing == Some(true),
+            ));
+        }
+        if c.anti_wind {
+            let winds: Vec<CheckMenuItem> = WIND_ORDER
+                .iter()
+                .map(|w| {
+                    check(
+                        &format!("wind:{}", w.to_u8()),
+                        w.label(),
+                        h.anti_wind == Some(*w),
+                    )
+                })
+                .collect();
+            let refs: Vec<&dyn IsMenuItem> = winds.iter().map(|i| i as &dyn IsMenuItem).collect();
+            // part of noise cancelling: unavailable while noise control is Off
+            let _ = menu.append(&submenu_enabled(
+                "Wind noise reduction",
+                &refs,
+                mode != Some(NoiseMode::Off),
+            ));
+        }
+        if !modes.is_empty() || c.transparency_switch || c.anti_wind {
+            let _ = menu.append(&PredefinedMenuItem::separator());
+        }
 
         // sound
         if h.caps.eq != protocol::EqGen::Unsupported && h.eq.known {
             use crate::ui::eq::EqChoice;
             let choice = crate::ui::eq::eq_choice(h, &h.eq.bands, &settings.custom_presets, false);
             let is = |c: EqChoice| choice.as_ref() == Some(&c);
-            let mut presets = vec![check("eq:neutral", "Neutral", is(EqChoice::Neutral))];
-            presets.extend(PRESETS.iter().enumerate().map(|(i, (name, _))| {
-                check(
-                    &format!("preset:{i}"),
-                    name,
-                    is(EqChoice::Preset(name.to_string())),
-                )
-            }));
+            let mut presets = Vec::new();
+            if h.caps.eq_off {
+                presets.push(check("eq:neutral", "Neutral", is(EqChoice::Neutral)));
+            }
+            presets.extend(
+                h.product
+                    .presets()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name, _))| {
+                        check(
+                            &format!("preset:{i}"),
+                            name,
+                            is(EqChoice::Preset(name.to_string())),
+                        )
+                    }),
+            );
             presets.extend(settings.custom_presets.iter().enumerate().map(|(i, p)| {
                 check(
                     &format!("upreset:{i}"),
@@ -176,13 +196,16 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
         // settings submenu
         let s = Submenu::new("Headset settings", true);
         let c = &h.caps;
+        // smart pause and auto-answer depend on on-head detection where the product has it
+        let on_head = !c.on_head_detection || h.on_head_detection == Some(true);
         if c.on_head_detection {
             let _ = s.append(&check(
                 "onhead",
                 "On-head detection",
                 h.on_head_detection == Some(true),
             ));
-            let on_head = h.on_head_detection == Some(true);
+        }
+        if c.smart_pause {
             let _ = s.append(&CheckMenuItem::with_id(
                 "smartpause",
                 "Smart pause",
@@ -190,21 +213,23 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
                 h.smart_pause == Some(true),
                 None,
             ));
-            if c.auto_answer_calls {
-                let _ = s.append(&CheckMenuItem::with_id(
-                    "autocall",
-                    "Auto-answer calls",
-                    on_head,
-                    h.auto_call == Some(true),
-                    None,
-                ));
-            }
         }
-        let _ = s.append(&check(
-            "comfort",
-            COMFORT_CALLS_TITLE,
-            h.comfort_call == Some(true),
-        ));
+        if c.auto_answer_calls {
+            let _ = s.append(&CheckMenuItem::with_id(
+                "autocall",
+                "Auto-answer calls",
+                on_head,
+                h.auto_call == Some(true),
+                None,
+            ));
+        }
+        if c.comfort_call {
+            let _ = s.append(&check(
+                "comfort",
+                COMFORT_CALLS_TITLE,
+                h.comfort_call == Some(true),
+            ));
+        }
         if c.touch_lock {
             let _ = s.append(&check(
                 "touchlock",
@@ -246,13 +271,15 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
             let refs: Vec<&dyn IsMenuItem> = prompts.iter().map(|i| i as &dyn IsMenuItem).collect();
             let _ = s.append(&submenu(PROMPTS_TITLE, &refs));
         }
-        let side: Vec<CheckMenuItem> = SIDETONE_LABELS
-            .iter()
-            .enumerate()
-            .map(|(i, l)| check(&format!("sidetone:{i}"), l, h.sidetone == Some(i as u8)))
-            .collect();
-        let refs: Vec<&dyn IsMenuItem> = side.iter().map(|i| i as &dyn IsMenuItem).collect();
-        let _ = s.append(&submenu(SIDETONE_TITLE, &refs));
+        if c.sidetone_max > 0 {
+            let side: Vec<CheckMenuItem> = sidetone_labels(c.sidetone_max)
+                .iter()
+                .enumerate()
+                .map(|(i, l)| check(&format!("sidetone:{i}"), l, h.sidetone == Some(i as u8)))
+                .collect();
+            let refs: Vec<&dyn IsMenuItem> = side.iter().map(|i| i as &dyn IsMenuItem).collect();
+            let _ = s.append(&submenu(SIDETONE_TITLE, &refs));
+        }
         let _ = menu.append(&s);
 
         // multipoint: the hosts paired with the headset; click connects or disconnects
@@ -308,6 +335,11 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
     let _ = menu.append(&item("open", "Open Sennheiser Control", true));
     let _ = menu.append(&item("settings", "Settings…", true));
     let _ = menu.append(&check("autostart", "Start with Windows", autostart));
+    let _ = menu.append(&check(
+        "startmin",
+        "Start minimized",
+        settings.start_minimized,
+    ));
     let _ = menu.append(&PredefinedMenuItem::separator());
     let _ = menu.append(&item("quit", "Quit", true));
     menu
@@ -329,11 +361,26 @@ pub fn handle(id: &str, shared: &Shared) {
             let _ = crate::platform::set_autostart(!crate::platform::autostart_enabled());
             shared.wake_all();
         }
-        "noise" => act(Action::SetNoiseMode(match arg {
-            "custom" => NoiseMode::Custom,
-            "off" => NoiseMode::Off,
-            _ => NoiseMode::Adaptive,
-        })),
+        "startmin" => {
+            shared.update_settings(|s| s.start_minimized = !s.start_minimized);
+            // entries from older versions force --minimized; rewrite so login follows the setting
+            if crate::platform::autostart_enabled() {
+                let _ = crate::platform::set_autostart(true);
+            }
+        }
+        "noise" => {
+            let modes = h.map(|h| h.noise_modes()).unwrap_or_default();
+            if let Some(m) = modes.into_iter().find(|m| m.label().to_lowercase() == arg) {
+                act(Action::SetNoiseMode(m));
+            }
+        }
+        "transparency" => {
+            if let Some(h) = h {
+                act(Action::SetTransparentHearing(
+                    h.transparent_hearing != Some(true),
+                ));
+            }
+        }
         "level" => {
             if let Some(l) = num() {
                 act(Action::SetTransparency(l.min(100) as u8));
@@ -345,7 +392,7 @@ pub fn handle(id: &str, shared: &Shared) {
             }
         }
         "preset" => {
-            if let Some((_, bands)) = num().and_then(|i| PRESETS.get(i as usize)) {
+            if let Some((_, bands)) = h.and_then(|h| h.product.presets().get(num()? as usize)) {
                 act(Action::SetEqBands(*bands));
             }
         }
@@ -432,7 +479,9 @@ mod tests {
         "quit",
         "btsettings",
         "autostart",
+        "startmin",
         "noise",
+        "transparency",
         "level",
         "wind",
         "eq",
@@ -509,6 +558,7 @@ mod tests {
             devices: vec![DeviceEntry {
                 id: "m4".into(),
                 name: "MOMENTUM 4".into(),
+                product: protocol::Product::Momentum4,
                 address: "00:1b:66:00:00:01".into(),
                 connected: true,
             }],

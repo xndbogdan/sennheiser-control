@@ -27,6 +27,8 @@ pub struct Settings {
     pub preferred_device: Option<String>,
     /// Closing the window hides it to the tray instead of quitting.
     pub close_to_tray: bool,
+    /// Every launch, including Start with Windows, goes straight to the tray without opening the window.
+    pub start_minimized: bool,
     /// Show a notification when the battery drops to this level (0 = off).
     pub low_battery_threshold: u8,
     pub theme: ThemePref,
@@ -40,6 +42,7 @@ impl Default for Settings {
         Self {
             preferred_device: None,
             close_to_tray: true,
+            start_minimized: false,
             low_battery_threshold: 15,
             theme: ThemePref::System,
             custom_presets: Vec::new(),

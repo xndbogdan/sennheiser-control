@@ -568,3 +568,85 @@ Get codec                   FF 03 00 00 04 95 08 00
 Audio mode = Podcast        FF 03 00 02 04 95 08 03 00 02
 Touch lock on               FF 03 00 01 04 95 16 06 01
 ```
+
+## 8. Other GAIA v3 products (untested)
+
+Source: **Sennheiser Smart Control 4.9.4** (versionCode 175297, `Sennheiser Smart Control_4.9.4_APKPure.xapk`,
+SHA-256 `b141a62b88494718d2a82d891f5bf330242203f35d5c06df269cf1f356f0b3a3`). Its `m4.json` and `features/*` are
+identical to 4.9.3. The product classes referenced below (`Acp1Product`, …) are in `bundle.pretty.js` from 4.9.3.
+The device models are kept next to `m4.json` in `re/device-model/`.
+
+Every `protocol: "GAIAV3"` model uses the **same vendor `0x0495` command ids** as `m4.json` (checked property by
+property with a diff script). What differs is which properties exist, which UI the app builds, and the transport.
+
+| Product | BT names | Model id prefix | Android transport |
+|---|---|---|---|
+| ACCENTUM Wireless (`ac1`) | `ACCENTUM`, `VENUS` | `ACAEBT`, `AC1`, `VENUS` | Classic, `GAIA3_SPP_UUID` |
+| ACCENTUM Plus Wireless (`acp1`) | `ACCENTUM Plus`, `APHRODITE` | `ACPAEBT`, `ACP1`, `APHRODITE` | Classic, `GAIA3_SPP_UUID` |
+| ACCENTUM True Wireless (`atw1`) | `ACCENTUM TW` | `ATW1` | Classic, `GAIA3_SPP_UUID` |
+| MOMENTUM True Wireless 3 (`tw3`) | `MOMENTUM TW 3` | `MTW3` | Classic, `GAIA3_SPP_UUID` (fw ≥ 2.11.26) |
+| MOMENTUM True Wireless 4 (`tw4`) | `MOMENTUM TW 4`, `MOMENTUM TW4` | `MTW4` | Classic, `GAIA3_SPP_UUID` |
+| MOMENTUM Sport (`msport1`) | `MOMENTUM Sport`, `Magnum`, … | `MSPORT1`, `Magnum` | Classic, `GAIA3_SPP_UUID` |
+| CX True Wireless, Sport True Wireless, CX Plus True Wireless, CX 500BT | | | **BLE only**, not supported |
+
+Transport is from the device-config switch (`:64126-66180`); BT names are from `deviceTypeByBluetoothNameMap`
+(`:21714`); model ids are from `getDeviceTypeByManufacturerName` (`:21286`). The app matches BT names exactly. This app
+also accepts a known name followed by a space and more words. After connecting, the model id overrides the name.
+
+### Features per product (`Capabilities::new`)
+
+| | ACCENTUM Plus | ACCENTUM | ACCENTUM TW | MTW 3 | MTW 4 | MOMENTUM Sport |
+|---|---|---|---|---|---|---|
+| Noise control | as M4, no ANC off | ANC + transparency on/off | Off / ANC / Outdoor + TH switch | same, from 2.3.0 | same | ANC / Outdoor / Transparency |
+| Anti-wind setting | yes | yes | (mode) | (mode) | (mode) | (mode) |
+| Sidetone max | 4 | 2 | 2 | – | 3 (fw ≥ 5.3.0) | 2 |
+| On-head detection | ≥ 2.6.3 | – | – | – | – | – |
+| Smart pause / auto-answer | with on-head (auto-answer ≥ 2.13.28) | – | plain switches | plain | plain | plain |
+| Comfort calls | yes | – | – | – | – | – |
+| Touch lock (`0x1606`) | ≥ 3.14.6 | – | yes | yes | yes | – (uses `Touch_Locked`) |
+| Better audio (`0x0405`) | – | – | – | ≥ 2.9.0 | yes | ≥ 3.17.14 |
+| Sound personalization | 2.12.0 ..< 3.16.4 | – | – | ≥ 2.12.0 | < 5.0.0 | – |
+| EQ Gen1 / Gen2 | ≥ 2.12.0 / ≥ 3.16.4 | ≥ 2.12.0 / ≥ 3.16.4 | ≥ 2.10.5 / ≥ 5.0.26 | ≥ 2.10.5 / – | any / ≥ 5.0.0 | any / ≥ 3.16.4 |
+| Audio mode 0 = EQ off | from Gen2 fw | from Gen2 fw | from Gen2 fw | – | from Gen2 fw | from Gen2 fw |
+
+Gates come from each model's `parameters`, its `features` list (`user-eq-2`, `audio-mode-2` and
+`sound-personalization-2` carry a `minVersion`) and the gates in `createProductFeatures`. The app's
+`isVersionGreaterEqual` treats a missing gate as "enabled". The EQ engine is the exception: it defaults a missing
+`Eq5Band_Gen1_MinFwVersion` to 99.99.99.
+
+- **`audio-mode-2`** adds `OFF = 0` and renames 3 to `PERSONALIZED_SOUND`. `audio-mode-1` has no EQ-off mode, so
+  "Neutral" is only offered from the `audio-mode-2` firmware on.
+- **`sound-personalization-2`** has a different state enum (`calibrating 1, calibrated 2, activation_inhibited 3`).
+  It isn't mapped, so personalization is hidden on that firmware.
+- **Gen1 EQ** uses each product's `get5BandParametersForDevice` entry (`:70218-70380`, in `eq.rs`).
+  - ACCENTUM labels its Gen1 bands 50/250/800/3000/8000 Hz; this app shows the M4 labels.
+- **Presets** come from `getOriginalPresets` (`:22448`): `accentum_5BandEqPresets` for AC/ACP,
+  `mtw3_5BandEqPresets` for ATW1/MTW3/MTW4, and "Natural" plus the MTW3 presets for the Sport.
+
+### Noise-control writes (`sendFeatureToDevice`)
+
+| Product | Mode | Writes, in order |
+|---|---|---|
+| ACCENTUM | ANC / Transparency | `TransparentHearing_Status` (`0x1804`) = 0 / 1 |
+| ACCENTUM TW, MTW 3/4 | Off | `ANC_Status = 0` |
+| | ANC | `ANC (1, 0)`, `ANC_Status = 1` |
+| | Outdoor | `ANC (1, 1)`, `ANC_Status = 1` |
+| | Transparent hearing switch | `TransparentHearing_Status = 0/1` |
+| MOMENTUM Sport | ANC / Outdoor | `ANC_Status = 1`, `ANC (1, 0 / 1)` (this app then re-reads `TransparentHearing_Status`) |
+| | Transparency | `TransparentHearing_Status = 1` |
+
+Reading follows `mapToFeature`:
+- **Tile products:** `ANC_Status = 0` is Off. Otherwise the anti-wind state decides between ANC and Outdoor.
+- **Sport:** transparent hearing on wins.
+- **ACCENTUM:** transparent hearing on/off.
+
+**Earbud battery.** `Battery_Percent` is `[left, right, case?]` (`mapBatteryValue`, `:72954`).
+- 0 or 255 for a bud means it isn't reporting, and the app shows the other one.
+- This app shows the lower bud as the headline level, and the buds and case as chips.
+- `Battery_ChargingStatus` is one state per bud; either one at 1 counts as charging.
+
+**Not implemented** (unverified or phone-only):
+- the transparent-hearing level slider (`TransparentHearing`, `0x1802`, 1–100) on the true wireless products
+- "pause music at full transparency" (meaning conflicts between products)
+- the MOMENTUM Sport `Touch_Locked` / tap sensitivity and sensors
+- MMI remapping, eco mode / battery protection, low latency, aptX Lossless, fit test, find device, Auracast

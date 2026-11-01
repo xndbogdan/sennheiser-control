@@ -25,6 +25,40 @@ pub const PRESETS: &[(&str, [f32; BANDS])] = &[
     ("Jazz", [-3.2, 0.0, 2.2, 2.2, 0.0]),
 ];
 
+/// `accentum_5BandEqPresets` (bundle.pretty.js:12632), ACCENTUM and ACCENTUM Plus.
+pub const ACCENTUM_PRESETS: &[(&str, [f32; BANDS])] = &[
+    ("Rock", [0.0, 0.0, 3.0, 3.0, -1.0]),
+    ("Pop", [0.0, -5.0, 0.0, 5.0, 0.0]),
+    ("Dance", [2.0, -3.0, -3.0, 1.0, 1.0]),
+    ("Hip-Hop", [3.0, -1.0, -4.0, 2.0, 0.0]),
+    ("Classical", [0.0, 0.0, 0.0, 1.0, 2.0]),
+    ("Movie", [0.0, 0.0, 2.0, 2.0, -1.0]),
+    ("Jazz", [-3.0, 0.0, 2.0, 2.0, 0.0]),
+];
+
+/// `mtw3_5BandEqPresets` (bundle.pretty.js:12664), MOMENTUM True Wireless 3/4 and ACCENTUM True Wireless.
+pub const MTW3_PRESETS: &[(&str, [f32; BANDS])] = &[
+    ("Rock", [-2.5, 0.5, 2.5, -0.5, -3.5]),
+    ("Pop", [0.0, -2.5, 0.0, 2.5, -1.0]),
+    ("Dance", [3.0, -1.0, -2.0, 0.0, 1.0]),
+    ("Hip-Hop", [2.5, 1.5, -1.5, -1.5, -1.5]),
+    ("Classical", [-3.5, -1.5, 0.0, 1.5, 0.5]),
+    ("Movie", [-3.0, -1.0, 0.0, 1.0, -4.0]),
+    ("Jazz", [-4.0, 0.0, 1.0, 3.0, -1.0]),
+];
+
+/// `momentum_sport_5BandEqPresets` (bundle.pretty.js:12696): "Natural" plus the MTW3 presets.
+pub const MSPORT1_PRESETS: &[(&str, [f32; BANDS])] = &[
+    ("Natural", [-2.0, 1.0, 0.0, 0.7, 0.0]),
+    ("Rock", [-2.5, 0.5, 2.5, -0.5, -3.5]),
+    ("Pop", [0.0, -2.5, 0.0, 2.5, -1.0]),
+    ("Dance", [3.0, -1.0, -2.0, 0.0, 1.0]),
+    ("Hip-Hop", [2.5, 1.5, -1.5, -1.5, -1.5]),
+    ("Classical", [-3.5, -1.5, 0.0, 1.5, 0.5]),
+    ("Movie", [-3.0, -1.0, 0.0, 1.0, -4.0]),
+    ("Jazz", [-4.0, 0.0, 1.0, 3.0, -1.0]),
+];
+
 pub fn clamp_gain(g: f32) -> f32 {
     if g.is_nan() {
         0.0
@@ -97,6 +131,65 @@ pub const M4_GEN1: Gen1Params = Gen1Params {
     max_headroom: [5.0, 5.0, 4.0, 3.0, 2.0],
     q_factor: [SQRT1_2; 4],
     shelf_freq: [120.0, 400.0, 3000.0, 6000.0],
+};
+
+// Other products' `get5BandParametersForDevice` entries (bundle.pretty.js:70240-70380).
+// shortcut: ACCENTUM Gen1 labels its bands 50/250/800/3000/8000 Hz in the official app; the editor always shows the
+// M4 labels. Only matters below fw 3.16.4.
+
+/// ACCENTUM and ACCENTUM Plus.
+pub const ACCENTUM_GEN1: Gen1Params = Gen1Params {
+    min_gain: -6.0,
+    max_gain: 6.0,
+    bass_boost: [5.0, -2.0, 0.0, 0.0, 0.0],
+    loudness_weights: [-26.683, -10.813, -4.773, -4.813, -5.993],
+    max_headroom: [0.0; BANDS],
+    q_factor: [SQRT1_2; 4],
+    shelf_freq: [125.0, 400.0, 1600.0, 5000.0],
+};
+
+/// MOMENTUM True Wireless 3.
+pub const MTW3_GEN1: Gen1Params = Gen1Params {
+    min_gain: -6.0,
+    max_gain: 6.0,
+    bass_boost: [4.0, 1.5, 0.0, 0.0, 0.0],
+    loudness_weights: [-28.4, -10.6, -3.7, -3.6, -13.9],
+    max_headroom: [3.0, 6.0, 3.0, 3.0, 3.0],
+    q_factor: [0.5, SQRT1_2, SQRT1_2, SQRT1_2],
+    shelf_freq: [90.0, 325.0, 1500.0, 6500.0],
+};
+
+/// MOMENTUM Sport.
+pub const MSPORT1_GEN1: Gen1Params = Gen1Params {
+    min_gain: -6.0,
+    max_gain: 6.0,
+    bass_boost: [3.0, 3.0, 0.0, 0.0, 0.0],
+    loudness_weights: [-28.4, -10.6, -3.7, -3.6, -13.9],
+    max_headroom: [2.0; BANDS],
+    q_factor: [0.5, SQRT1_2, SQRT1_2, SQRT1_2],
+    shelf_freq: [90.0, 325.0, 1500.0, 6500.0],
+};
+
+/// ACCENTUM True Wireless.
+pub const ATW1_GEN1: Gen1Params = Gen1Params {
+    min_gain: -6.0,
+    max_gain: 6.0,
+    bass_boost: [6.0, 3.0, 0.0, 1.5, 0.0],
+    loudness_weights: [-26.683, -10.813, -4.773, -4.813, -5.993],
+    max_headroom: [2.5; BANDS],
+    q_factor: [0.5, SQRT1_2, SQRT1_2, SQRT1_2],
+    shelf_freq: [90.0, 325.0, 1500.0, 6500.0],
+};
+
+/// MOMENTUM True Wireless 4.
+pub const MTW4_GEN1: Gen1Params = Gen1Params {
+    min_gain: -6.0,
+    max_gain: 6.0,
+    bass_boost: [4.0, 1.5, 0.0, 0.0, 0.0],
+    loudness_weights: [-28.4, -10.6, -3.7, -3.6, -13.9],
+    max_headroom: [3.0; BANDS],
+    q_factor: [0.5, SQRT1_2, SQRT1_2, SQRT1_2],
+    shelf_freq: [90.0, 325.0, 1500.0, 6500.0],
 };
 
 /// Knob Y storage flags (`EqKnobValuesCoder`).
@@ -292,10 +385,18 @@ mod tests {
 
     #[test]
     fn gen1_roundtrip_through_decode() {
-        for (_, preset) in PRESETS {
+        for p in crate::Product::ALL {
+            for (_, preset) in p.presets() {
+                gen1_roundtrip(p.gen1_params(), preset);
+            }
+        }
+    }
+
+    fn gen1_roundtrip(params: &Gen1Params, preset: &[f32; BANDS]) {
+        {
             for bass in [false, true] {
                 let g = preset.map(|x| x as f64);
-                let e = gen1_encode(&M4_GEN1, &g, bass);
+                let e = gen1_encode(params, &g, bass);
                 let rsp: Vec<i16> = [
                     5,
                     257,
@@ -311,7 +412,7 @@ mod tests {
                 ]
                 .to_vec();
                 let back = gen1_decode(
-                    &M4_GEN1,
+                    params,
                     e.level_shift_x10,
                     gen1_knob_bass_boost(e.knob_y).unwrap(),
                     &rsp,

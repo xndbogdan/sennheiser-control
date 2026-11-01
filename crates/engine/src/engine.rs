@@ -8,10 +8,10 @@ use std::time::{Duration, Instant};
 use bluetooth::DiscoveryEvent;
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use parking_lot::RwLock;
-use protocol::{AudioMode, BtMode, EqGen, Request, anc_mode};
+use protocol::{AudioMode, BtMode, EqGen, NoiseStyle, Request, anc_mode};
 
 use crate::session::{self, Connector, Priority, SessionEvent, SessionHandle};
-use crate::state::{Action, AppState, DeviceEntry, LinkState, NoiseMode, SIDETONE_MAX};
+use crate::state::{Action, AppState, DeviceEntry, LinkState, NoiseMode};
 
 #[derive(Debug, Clone, Default)]
 pub struct EngineOptions {
@@ -200,12 +200,13 @@ impl Actor {
     fn on_discovery(&mut self, e: DiscoveryEvent) {
         match e {
             DiscoveryEvent::Added(d) => {
-                if !protocol::is_m4_name(&d.name) {
+                let Some(product) = protocol::Product::from_bt_name(&d.name) else {
                     return;
-                }
+                };
                 let entry = DeviceEntry {
                     id: d.id,
                     name: d.name,
+                    product,
                     address: d.address,
                     connected: d.connected,
                 };
@@ -229,6 +230,9 @@ impl Actor {
                         x.connected = c;
                     }
                     if let Some(n) = name {
+                        if let Some(p) = protocol::Product::from_bt_name(&n) {
+                            x.product = p;
+                        }
                         x.name = n;
                     }
                 }
@@ -343,12 +347,18 @@ impl Actor {
         }
         if self.session.is_none() && Instant::now() >= self.next_attempt {
             let id = self.state.active.clone().unwrap();
+            let product = self
+                .state
+                .active_device()
+                .map(|d| d.product)
+                .unwrap_or_default();
             self.generation += 1;
             self.state.link = LinkState::Connecting;
             self.state.headset = None;
             self.session = Some(session::spawn(
                 self.generation,
                 id,
+                product,
                 self.connector.clone(),
                 self.session_tx.clone(),
             ));
@@ -417,8 +427,39 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
         mode: anc_mode::ADAPTIVE,
         state: u8::from(on),
     };
-    // command order follows Smart Control Plus (`Xna` mode setters)
+    let wind = |on: bool| R::SetAncMode {
+        mode: anc_mode::ANTI_WIND,
+        state: u8::from(on),
+    };
     match a {
+        // the other products' tiles, with the writes of the official app's `sendFeatureToDevice`
+        Action::SetNoiseMode(m) if hs.caps.noise != NoiseStyle::AdaptiveBalance => {
+            if !hs.noise_modes().contains(m) {
+                return (r, Priority::High);
+            }
+            match (hs.caps.noise, m) {
+                (NoiseStyle::AncOrTransparency, _) => r.push(R::SetTransparentHearingStatus(
+                    *m == NoiseMode::Transparency,
+                )),
+                (NoiseStyle::AncTile, NoiseMode::Off) => r.push(R::SetAncStatus(false)),
+                (NoiseStyle::AncTile, _) => {
+                    r.extend([wind(*m == NoiseMode::Outdoor), R::SetAncStatus(true)])
+                }
+                (NoiseStyle::SportTile, NoiseMode::Transparency) => {
+                    r.push(R::SetTransparentHearingStatus(true))
+                }
+                (NoiseStyle::SportTile, _) => {
+                    // the app writes nothing for transparency here; read back what the headset switched off
+                    r.extend([
+                        R::SetAncStatus(true),
+                        wind(*m == NoiseMode::Outdoor),
+                        R::TransparentHearingStatus,
+                    ])
+                }
+                _ => {}
+            }
+        }
+        // M4 / ACCENTUM Plus; command order follows Smart Control Plus (`Xna` mode setters)
         Action::SetNoiseMode(NoiseMode::Adaptive) => {
             anc_on_first(&mut r);
             r.push(adaptive(true));
@@ -436,6 +477,8 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
                 r.push(R::SetAncStatus(false));
             }
         }
+        Action::SetNoiseMode(_) => {}
+        Action::SetTransparency(_) if hs.caps.noise != NoiseStyle::AdaptiveBalance => {}
         Action::SetTransparency(t) => {
             // picking a Custom level (e.g. from the tray) puts the headset in Custom mode
             if hs.adaptive != Some(false) {
@@ -444,11 +487,24 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
             anc_on_first(&mut r);
             r.push(R::SetTransparency((*t).min(100)));
         }
-        Action::SetAntiWind(w) => r.push(R::SetAncMode {
-            mode: anc_mode::ANTI_WIND,
-            state: w.to_u8(),
-        }),
-        Action::SetSidetone(v) => r.push(R::SetSidetone((*v).min(SIDETONE_MAX))),
+        Action::SetAntiWind(w) => {
+            if hs.caps.anti_wind {
+                r.push(R::SetAncMode {
+                    mode: anc_mode::ANTI_WIND,
+                    state: w.to_u8(),
+                })
+            }
+        }
+        Action::SetTransparentHearing(on) => {
+            if hs.caps.transparency_switch {
+                r.push(R::SetTransparentHearingStatus(*on))
+            }
+        }
+        Action::SetSidetone(v) => {
+            if hs.caps.sidetone_max > 0 {
+                r.push(R::SetSidetone((*v).min(hs.caps.sidetone_max)))
+            }
+        }
         Action::SetEqBands(bands) => {
             match hs.caps.eq {
                 EqGen::Gen2 => {
@@ -459,7 +515,11 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
                     )
                 }
                 EqGen::Gen1 => {
-                    r = protocol::eq::gen1_requests(&protocol::eq::M4_GEN1, bands, hs.eq.bass_boost)
+                    r = protocol::eq::gen1_requests(
+                        hs.product.gen1_params(),
+                        bands,
+                        hs.eq.bass_boost,
+                    )
                 }
                 EqGen::Unsupported => {}
             }
@@ -472,7 +532,7 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
             match hs.caps.eq {
                 EqGen::Gen2 => r.push(R::SetEq2SubMode(u8::from(*v))),
                 EqGen::Gen1 => {
-                    r = protocol::eq::gen1_requests(&protocol::eq::M4_GEN1, &hs.eq.bands, *v)
+                    r = protocol::eq::gen1_requests(hs.product.gen1_params(), &hs.eq.bands, *v)
                 }
                 EqGen::Unsupported => {}
             }
@@ -481,7 +541,7 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
             }
         }
         Action::SetEqEnabled(on) => {
-            if hs.caps.eq != EqGen::Unsupported {
+            if hs.caps.eq != EqGen::Unsupported && (*on || hs.caps.eq_off) {
                 r.push(R::SetAudioMode(if *on {
                     AudioMode::UserEq
                 } else {
@@ -494,11 +554,14 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
         } else {
             // back to whatever was playing before podcast mode
             match hs.pre_podcast_mode {
-                Some(m) if !m.is_podcast() => m,
+                Some(m) if !m.is_podcast() && (m != AudioMode::Off || hs.caps.eq_off) => m,
                 _ => AudioMode::UserEq,
             }
         })),
         Action::SetOnHeadDetection(v) => {
+            if !hs.caps.on_head_detection {
+                return (r, Priority::High);
+            }
             r.push(R::SetOnHeadDetection(*v));
             // the official app re-reads the dependent settings
             r.extend([R::SmartPause, R::Timer(0)]);
@@ -508,8 +571,16 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
         }
         Action::SetSmartPause(v) => r.push(R::SetSmartPause(*v)),
         Action::SetAutoCall(v) => r.push(R::SetAutoCall(*v)),
-        Action::SetComfortCall(v) => r.push(R::SetComfortCall(*v)),
-        Action::SetTouchLock(v) => r.push(R::SetTouchLock(*v)),
+        Action::SetComfortCall(v) => {
+            if hs.caps.comfort_call {
+                r.push(R::SetComfortCall(*v))
+            }
+        }
+        Action::SetTouchLock(v) => {
+            if hs.caps.touch_lock {
+                r.push(R::SetTouchLock(*v))
+            }
+        }
         Action::SetHiRes(on) => r.push(R::SetBtMode(if *on {
             BtMode::BestAudio
         } else {
@@ -538,14 +609,9 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
         }
         Action::FactoryReset => r.push(R::FactoryReset),
         Action::Refresh => {
-            r.extend([
-                R::Battery,
-                R::Charging,
-                R::Codec,
-                R::AncModes,
-                R::Transparency,
-                R::AudioMode,
-            ]);
+            r.extend([R::Battery, R::Charging, R::Codec]);
+            r.extend(crate::session::noise_reads(&hs.caps));
+            r.push(R::AudioMode);
             return (r, Priority::Low);
         }
         Action::SelectDevice(_) | Action::Reconnect => {}
@@ -557,7 +623,7 @@ fn plan(a: &Action, hs: &crate::state::HeadsetState) -> (Vec<Request>, Priority)
 mod tests {
     use super::*;
     use crate::state::HeadsetState;
-    use protocol::{Capabilities, Version};
+    use protocol::{AntiWind, Capabilities, Version};
 
     fn m4() -> HeadsetState {
         let mut h = HeadsetState {
@@ -628,6 +694,84 @@ mod tests {
             plan(&Action::SetNoiseMode(NoiseMode::Adaptive), &old).0,
             vec![adaptive_on]
         );
+    }
+
+    fn other(p: protocol::Product, fw: Version) -> HeadsetState {
+        let mut h = HeadsetState::default();
+        h.apply(&protocol::Update::Product(p));
+        h.apply(&protocol::Update::FirmwareVersion(fw));
+        h
+    }
+
+    #[test]
+    fn plans_other_products_noise_tiles() {
+        use protocol::Product as P;
+        let wind = |on| Request::SetAncMode {
+            mode: 1,
+            state: u8::from(on),
+        };
+        // MOMENTUM True Wireless 4: Off / ANC / Outdoor, transparent hearing separate (`Tw4Product`)
+        let mut tw4 = other(P::MomentumTw4, Version::new(5, 3, 0));
+        tw4.anc_status = Some(true);
+        tw4.anti_wind = Some(AntiWind::Max);
+        assert_eq!(tw4.noise_mode(), Some(NoiseMode::Outdoor));
+        assert_eq!(
+            plan(&Action::SetNoiseMode(NoiseMode::Anc), &tw4).0,
+            vec![wind(false), Request::SetAncStatus(true)]
+        );
+        assert_eq!(
+            plan(&Action::SetNoiseMode(NoiseMode::Off), &tw4).0,
+            vec![Request::SetAncStatus(false)]
+        );
+        assert_eq!(
+            plan(&Action::SetTransparentHearing(true), &tw4).0,
+            vec![Request::SetTransparentHearingStatus(true)]
+        );
+        // modes the product doesn't have are ignored
+        assert!(
+            plan(&Action::SetNoiseMode(NoiseMode::Adaptive), &tw4)
+                .0
+                .is_empty()
+        );
+        assert!(
+            plan(&Action::SetAntiWind(AntiWind::Auto), &tw4)
+                .0
+                .is_empty()
+        );
+        assert_eq!(
+            plan(&Action::SetSidetone(9), &tw4).0,
+            vec![Request::SetSidetone(3)]
+        );
+        // ACCENTUM: ANC always on, transparency on/off (`Ac1Product`)
+        let mut ac = other(P::Accentum, Version::new(3, 20, 0));
+        ac.transparent_hearing = Some(false);
+        assert_eq!(ac.noise_mode(), Some(NoiseMode::Anc));
+        assert_eq!(
+            plan(&Action::SetNoiseMode(NoiseMode::Transparency), &ac).0,
+            vec![Request::SetTransparentHearingStatus(true)]
+        );
+        assert!(plan(&Action::SetComfortCall(true), &ac).0.is_empty());
+        // MOMENTUM Sport: ANC / Outdoor / Transparency (`MomentumSport1Product`)
+        let mut sport = other(P::MomentumSport, Version::new(3, 17, 14));
+        sport.transparent_hearing = Some(true);
+        assert_eq!(sport.noise_mode(), Some(NoiseMode::Transparency));
+        assert_eq!(
+            plan(&Action::SetNoiseMode(NoiseMode::Outdoor), &sport).0,
+            vec![
+                Request::SetAncStatus(true),
+                wind(true),
+                Request::TransparentHearingStatus
+            ]
+        );
+        // ACCENTUM Plus behaves like the M4 without the ANC master switch
+        let acp = other(P::AccentumPlus, Version::new(3, 36, 1));
+        assert_eq!(
+            acp.noise_modes(),
+            vec![NoiseMode::Adaptive, NoiseMode::Custom]
+        );
+        // audio-mode-1 firmware has no EQ-off mode
+        let tw3 = other(P::MomentumTw3, Version::new(3, 0, 0));
+        assert!(plan(&Action::SetEqEnabled(false), &tw3).0.is_empty());
     }
 
     #[test]

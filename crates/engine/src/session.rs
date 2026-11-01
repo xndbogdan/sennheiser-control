@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use parking_lot::Mutex;
 use protocol::ids::feature;
-use protocol::{Capabilities, EqGen, Request, Update, decode};
+use protocol::{Capabilities, EqGen, NoiseStyle, Product, Request, Update, decode};
 
 use crate::client::{Client, ClientError, Unsolicited};
 use crate::transport::Transport;
@@ -74,6 +74,7 @@ impl Drop for SessionHandle {
 pub fn spawn(
     generation: u64,
     device_id: String,
+    product: Product,
     connector: Connector,
     events: Sender<(u64, SessionEvent)>,
 ) -> SessionHandle {
@@ -98,6 +99,7 @@ pub fn spawn(
                 stop,
                 high: high_rx,
                 low: low_rx,
+                product,
                 caps: Capabilities::default(),
             };
             w.run(&device_id, connector, transport);
@@ -112,6 +114,7 @@ struct Worker {
     stop: Arc<AtomicBool>,
     high: Receiver<Vec<Request>>,
     low: Receiver<Vec<Request>>,
+    product: Product,
     caps: Capabilities,
 }
 
@@ -184,14 +187,41 @@ impl Worker {
             .request(&Request::FirmwareVersion)
             .map_err(|e| format!("reading firmware version: {e}"))?;
         let mut ups = decode(&fw, Some(&Request::FirmwareVersion));
-        if let Some(Update::FirmwareVersion(v)) = ups.first() {
-            self.caps = Capabilities::for_m4(*v);
-        }
         for req in [Request::ModelId, Request::SerialNumber, Request::HwRevision] {
             if let Ok(p) = client.request(&req) {
                 ups.extend(decode(&p, Some(&req)));
             }
         }
+        // the model id is more reliable than the (renamable) Bluetooth name
+        let model_id = ups.iter().find_map(|u| match u {
+            Update::ModelId(m) => Some(m.clone()),
+            _ => None,
+        });
+        if let Some((p, _)) = model_id.as_deref().and_then(Product::from_model_id) {
+            self.product = p;
+        }
+        let firmware = ups.iter().find_map(|u| match u {
+            Update::FirmwareVersion(v) => Some(*v),
+            _ => None,
+        });
+        if let Some(v) = firmware {
+            self.caps = Capabilities::new(self.product, v);
+        }
+        let identity = format!(
+            "{} (model id {:?}, firmware {})",
+            self.product.name(),
+            model_id.as_deref().unwrap_or("?"),
+            firmware
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "?".into())
+        );
+        if self.product.verified() {
+            log::info!("connected: {identity}");
+        } else {
+            // lands in the error log, so reports from untested models say what was connected
+            log::warn!("connected to a model not yet tested with this app: {identity}");
+        }
+        ups.insert(0, Update::Product(self.product));
         self.emit(SessionEvent::Updates(ups));
         Ok(())
     }
@@ -213,26 +243,26 @@ impl Worker {
             features.push(feature::PERSONALIZED_SOUND);
         }
         r.extend(features.into_iter().map(Request::RegisterNotifications));
-        r.extend([
-            Request::Battery,
-            Request::Charging,
-            Request::Codec,
-            Request::AncModes,
-            Request::AncStatus,
-            Request::Transparency,
-            Request::Sidetone,
-            Request::AudioMode,
-            Request::ComfortCall,
-        ]);
+        r.extend([Request::Battery, Request::Charging, Request::Codec]);
+        r.extend(noise_reads(c));
+        r.push(Request::AudioMode);
+        if c.sidetone_max > 0 {
+            r.push(Request::Sidetone);
+        }
+        if c.comfort_call {
+            r.push(Request::ComfortCall);
+        }
         if c.voice_prompts {
             r.push(Request::PromptMode);
         }
         if c.on_head_detection {
-            r.extend([
-                Request::OnHeadDetection,
-                Request::SmartPause,
-                Request::Timer(0),
-            ]);
+            r.push(Request::OnHeadDetection);
+        }
+        if c.smart_pause {
+            r.push(Request::SmartPause);
+        }
+        if c.auto_power_off {
+            r.push(Request::Timer(0));
         }
         if c.auto_answer_calls {
             r.push(Request::AutoCall);
@@ -311,7 +341,11 @@ impl Worker {
                     }
                 }
                 Err(e @ ClientError::Rejected { .. }) => {
-                    log::info!("{req:?}: {e}");
+                    if self.product.verified() {
+                        log::info!("{req:?}: {e}");
+                    } else {
+                        log::warn!("{}: {req:?}: {e}", self.product.name());
+                    }
                     if is_user_change(req) {
                         self.emit(SessionEvent::CommandFailed(format!(
                             "The headset rejected this change ({e})"
@@ -366,6 +400,26 @@ impl Worker {
             }
         }
     }
+}
+
+/// Reads behind the noise-control UI of a product (only what its tile uses, so an untested model's error log only
+/// shows unexpected rejections).
+pub(crate) fn noise_reads(c: &Capabilities) -> Vec<Request> {
+    use Request as R;
+    let mut r = match c.noise {
+        NoiseStyle::None => vec![],
+        NoiseStyle::AdaptiveBalance => vec![R::AncModes, R::AncStatus, R::Transparency],
+        NoiseStyle::AncOrTransparency => vec![R::TransparentHearingStatus],
+        NoiseStyle::AncTile => vec![R::AncStatus, R::AncModes],
+        NoiseStyle::SportTile => vec![R::AncModes, R::TransparentHearingStatus],
+    };
+    if c.anti_wind && !r.contains(&R::AncModes) {
+        r.push(R::AncModes);
+    }
+    if c.transparency_switch {
+        r.push(R::TransparentHearingStatus);
+    }
+    r
 }
 
 fn is_user_change(r: &Request) -> bool {

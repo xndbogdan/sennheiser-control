@@ -29,7 +29,7 @@ assets/           app.ico (generated) and the logo SVG it is drawn from
 
 | Flag | Effect |
 |---|---|
-| `--minimized` | start in the tray (used by "Start with Windows") |
+| `--minimized` | start in the tray, like the "Start minimized" setting (which also applies to Start with Windows) |
 | `--quit` | ask the running instance to exit |
 | `--sim` | use a simulated headset (UI work without hardware). Runs as its own instance with `settings-sim.json` |
 | `--debug` | verbose log, including every GAIA frame (`%APPDATA%\SennheiserControl\app.log`) |
@@ -50,6 +50,10 @@ assets/           app.ico (generated) and the logo SVG it is drawn from
 ## Where things are stored
 
 - Settings: `%APPDATA%\SennheiserControl\settings.json`; `--sim` uses `settings-sim.json` next to it.
+- Logs, same folder: `app.log` (everything; `--debug` adds GAIA frames) and `sennheiser-control-error.log` (warnings,
+  errors and crashes with a backtrace, created on the first one). With an untested model, the error log also gets the
+  model id and firmware at connect and every command the headset rejected. Each log moves to `*.old.log` once it
+  gets big.
 - Start with Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SennheiserControl`.
 - Builds from before the rename used `HeadsetControl` for both. The first start moves the old settings folder and
   autostart entry over.
@@ -64,6 +68,10 @@ Write commands are only added once their format is confirmed from the official a
 decompiled code); unverified ones (rename, multipoint switch, prompt volume/language) stay out.
 
 ## Known gaps
+
+- Only the MOMENTUM 4 has been tested on hardware. The other products in `crates/protocol/src/product.rs` are built
+  from Smart Control's device models and product code (PROTOCOL.md §8). Their feature sets live in
+  `Capabilities::new`.
 
 - On firmware older than 3.18 the EQ uses the "gen 1" encoding. It matches the official app byte for byte, but is
   untested on hardware because the test unit runs 3.38.3.

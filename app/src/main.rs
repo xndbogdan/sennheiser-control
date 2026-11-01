@@ -1,6 +1,6 @@
 //! Sennheiser Control — unofficial Windows tray app for the Sennheiser MOMENTUM 4.
 //!
-//! Flags: `--minimized` (start in the tray), `--sim` (simulated headset), `--debug` (verbose log),
+//! Flags: `--minimized` (start in the tray, like the "Start minimized" setting), `--sim` (simulated headset), `--debug` (verbose log),
 //! `--quit` (ask the running instance to exit), `--render-icons DIR` (dev: icon previews + app.ico).
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -23,8 +23,13 @@ pub const APP_DIR: &str = "SennheiserControl";
 /// Name used before the rename; its settings folder and autostart entry are migrated once.
 pub const LEGACY_APP_DIR: &str = "HeadsetControl";
 
+/// Warnings, errors and panics also go here; created on first use so it only exists when something went wrong.
+pub const ERROR_LOG: &str = "sennheiser-control-error.log";
+
 struct FileLogger {
     file: parking_lot::Mutex<std::fs::File>,
+    errors: parking_lot::Mutex<Option<std::fs::File>>,
+    error_path: std::path::PathBuf,
     level: log::LevelFilter,
 }
 
@@ -35,6 +40,7 @@ impl log::Log for FileLogger {
                 || m.target().starts_with("bluetooth")
                 || m.target().starts_with("headset")
                 || m.target().starts_with("app")
+                || m.target().starts_with("sennheiser_control")
                 || m.level() <= log::Level::Warn)
     }
     fn log(&self, r: &log::Record) {
@@ -43,17 +49,35 @@ impl log::Log for FileLogger {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs_f64())
                 .unwrap_or(0.0);
-            let _ = writeln!(
-                self.file.lock(),
-                "{t:.3} {:<5} {}: {}",
-                r.level(),
-                r.target(),
-                r.args()
-            );
+            let line = format!("{t:.3} {:<5} {}: {}", r.level(), r.target(), r.args());
+            let _ = writeln!(self.file.lock(), "{line}");
+            if r.level() <= log::Level::Warn {
+                let mut errors = self.errors.lock();
+                if errors.is_none() {
+                    *errors = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(&self.error_path)
+                        .ok();
+                }
+                if let Some(f) = errors.as_mut() {
+                    let _ = writeln!(f, "{line}");
+                }
+            }
         }
     }
     fn flush(&self) {
         let _ = self.file.lock().flush();
+        if let Some(f) = self.errors.lock().as_mut() {
+            let _ = f.flush();
+        }
+    }
+}
+
+/// Keep a log below `max` bytes by moving the previous run's content aside.
+fn rotate(path: &std::path::Path, old: &str, max: u64) {
+    if std::fs::metadata(path).is_ok_and(|m| m.len() > max) {
+        let _ = std::fs::rename(path, path.with_file_name(old));
     }
 }
 
@@ -61,11 +85,9 @@ fn init_logging(debug: bool) {
     let dir = settings::dir();
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("app.log");
-    if let Ok(meta) = std::fs::metadata(&path)
-        && meta.len() > 2_000_000
-    {
-        let _ = std::fs::rename(&path, dir.join("app.old.log"));
-    }
+    rotate(&path, "app.old.log", 2_000_000);
+    let error_path = dir.join(ERROR_LOG);
+    rotate(&error_path, "sennheiser-control-error.old.log", 1_000_000);
     if let Ok(file) = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -78,6 +100,8 @@ fn init_logging(debug: bool) {
         };
         if log::set_boxed_logger(Box::new(FileLogger {
             file: parking_lot::Mutex::new(file),
+            errors: parking_lot::Mutex::new(None),
+            error_path,
             level,
         }))
         .is_ok()
@@ -85,12 +109,27 @@ fn init_logging(debug: bool) {
             log::set_max_level(level);
         }
     }
+    // the release build has no console, so a panic would otherwise vanish without a trace
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        log::error!(
+            target: "app",
+            "crash in thread '{}' ({} {}): {info}\n{}",
+            thread.name().unwrap_or("unnamed"),
+            APP_NAME,
+            env!("CARGO_PKG_VERSION"),
+            std::backtrace::Backtrace::force_capture()
+        );
+        log::logger().flush();
+        default_hook(info);
+    }));
 }
 
 fn main() -> eframe::Result {
     let args: Vec<String> = std::env::args().collect();
     let has = |f: &str| args.iter().any(|a| a == f);
-    let (minimized, simulate) = (has("--minimized"), has("--sim"));
+    let simulate = has("--sim");
     if let Some(i) = args.iter().position(|a| a == "--render-icons") {
         let dir = std::path::PathBuf::from(args.get(i + 1).map(String::as_str).unwrap_or("."));
         tray::icon::dev_render(&dir);
@@ -111,12 +150,12 @@ fn main() -> eframe::Result {
             quit_event,
         } => (show_event, quit_event),
     };
+    let settings = settings::Settings::load();
+    let minimized = has("--minimized") || settings.start_minimized;
     log::info!(
         "starting {APP_NAME} {} (minimized={minimized}, sim={simulate})",
         env!("CARGO_PKG_VERSION")
     );
-
-    let settings = settings::Settings::load();
     let icon = egui::IconData {
         rgba: tray::icon::app_icon(64),
         width: 64,
@@ -207,4 +246,8 @@ fn main() -> eframe::Result {
             Ok(Box::new(app))
         }),
     )
+    .inspect_err(|e| {
+        log::error!("window failed: {e}");
+        log::logger().flush();
+    })
 }

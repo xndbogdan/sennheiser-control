@@ -20,20 +20,40 @@ Enough of it works to keep me satisfied, and I didn't care to investigate anythi
 something that doesn't work, [open an issue](https://github.com/xndbogdan/sennheiser-control/issues) and complain
 there.
 
+## Other Sennheiser headphones (experimental)
+
+These speak the same protocol as the M4, so the app tries them too. Each one only gets the features Sennheiser's own
+app offers for it:
+
+- ACCENTUM Wireless and ACCENTUM Plus Wireless
+- ACCENTUM True Wireless
+- MOMENTUM True Wireless 3 and 4
+- MOMENTUM Sport
+
+I only own an M4, so none of these have been tested. Everything is taken from how Sennheiser's app talks to them.
+If something misbehaves, attach `%APPDATA%\SennheiserControl\sennheiser-control-error.log` to your issue. With
+these models the app writes the model and firmware there when it connects, followed by every command the headset
+turns down and any crash.
+
+Not supported: the CX earbuds (Sennheiser's app reaches those over Bluetooth LE only), and older models like the
+MOMENTUM 3, PXC 550, HD 450BT or the first two MOMENTUM True Wireless, which use a different protocol.
+
 ## Getting started
 
-1. Pair the MOMENTUM 4 with Windows and connect it.
+1. Pair the headphones with Windows and connect them.
 2. Grab `sennheiser-control.exe` from [Releases](https://github.com/xndbogdan/sennheiser-control/releases) and
    run it. There's no installer. Windows will grumble because it isn't signed: *More info → Run anyway*.
 3. Left-click the tray icon for the window, right-click for the quick menu. Closing the window keeps the app in
-   the tray; *Quit* is in the menu. Want it at login? Tray menu → *Start with Windows*.
+   the tray; *Quit* is in the menu. Want it at login? Tray menu → *Start with Windows*. Tick *Start minimized* too
+   if it should start in the tray without opening the window.
 
    ![The tray menu](screenshots/tray-menu.png)
 
 ## Good to know
 
 - Low-battery alerts are regular Windows notifications, so they only show up if notifications are on.
-- Tested on firmware 3.38.3.
+- Tested on M4 firmware 3.38.3.
+- Crashes and errors go to `%APPDATA%\SennheiserControl\sennheiser-control-error.log`.
 - Not there yet: renaming the headphones, the multipoint on/off switch, prompt volume.
 
 ## Nerd stuff

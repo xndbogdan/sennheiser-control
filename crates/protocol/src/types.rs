@@ -134,6 +134,13 @@ pub const TIMER_POWER_OFF: u8 = 0;
 pub const TIMER_LIMBO: u8 = 1;
 
 /// ANC "mode" ids used in the ANC mode/state pairs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EarbudBattery {
+    pub left: Option<u8>,
+    pub right: Option<u8>,
+    pub case: Option<u8>,
+}
+
 pub mod anc_mode {
     pub const ANTI_WIND: u8 = 1;
     /// Reported by the M4 but never used by the official app. Probably anti-pressure (unverified).

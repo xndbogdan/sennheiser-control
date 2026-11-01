@@ -49,6 +49,8 @@ pub struct HeadsetApp {
     rx: Receiver<UiCmd>,
     tray_thread: Option<JoinHandle<()>>,
     visible: bool,
+    /// Started in the tray: hide the window eframe shows after its first frame.
+    hide_on_start: bool,
     quitting: bool,
     pub page: Page,
     state: AppState,
@@ -100,6 +102,7 @@ impl HeadsetApp {
             rx,
             tray_thread: Some(tray_thread),
             visible,
+            hide_on_start: !visible,
             quitting: false,
             page: Page::Main,
             settings,
@@ -393,6 +396,11 @@ impl HeadsetApp {
 
 impl eframe::App for HeadsetApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // eframe 0.36 ignores `with_visible(false)` and shows the window after the first frame
+        // (`EpiIntegration::post_rendering`); commands from this frame are applied after that
+        if std::mem::take(&mut self.hide_on_start) {
+            ctx.send_viewport_cmd(ViewportCommand::Visible(false));
+        }
         while let Ok(cmd) = self.rx.try_recv() {
             match cmd {
                 UiCmd::Show => self.set_visible(ctx, true),

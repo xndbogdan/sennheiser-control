@@ -7,13 +7,17 @@ use crate::types::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Update {
+    /// Which product the session is talking to (from the Bluetooth name and model id; not a wire message).
+    Product(crate::Product),
     FirmwareVersion(Version),
     ModelId(String),
     SerialNumber(String),
     HwRevision(u16),
     ComponentVersions(Vec<u8>),
-    /// Battery percentage; `None` when the headset reports 255 (unknown).
+    /// Battery percentage; `None` when the headset reports 255 (unknown). For earbuds, the lower of the two buds.
     Battery(Option<u8>),
+    /// Earbuds report `[left, right, case?]` (`mapBatteryValue`, bundle.pretty.js:72954).
+    Earbuds(EarbudBattery),
     Charging(ChargingState),
     Timer {
         id: u8,
@@ -95,6 +99,31 @@ fn flag(p: &[u8]) -> Option<bool> {
 }
 
 /// Decode an ANC mode/state pair list into typed updates.
+fn battery(d: &[u8]) -> Vec<Update> {
+    let level = |v: u8| (v <= 100).then_some(v);
+    match *d {
+        [] => Vec::new(),
+        [v] => vec![Update::Battery(level(v))],
+        [l, r, ref rest @ ..] => {
+            // 0 or 255: that bud isn't reporting (in the case or out of range)
+            let bud = |v: u8| level(v).filter(|&v| v > 0);
+            let (left, right) = (bud(l), bud(r));
+            let lowest = match (left, right) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            };
+            vec![
+                Update::Battery(lowest),
+                Update::Earbuds(EarbudBattery {
+                    left,
+                    right,
+                    case: rest.first().and_then(|&c| level(c)),
+                }),
+            ]
+        }
+    }
+}
+
 fn anc_pairs(p: &[u8]) -> Vec<Update> {
     let pairs: Vec<(u8, u8)> = p.chunks_exact(2).map(|c| (c[0], c[1])).collect();
     let mut out = Vec::new();
@@ -149,11 +178,15 @@ pub fn decode(p: &Packet, request: Option<&Request>) -> Vec<Update> {
         sn::MODEL_ID_GET => vec![Update::ModelId(string(d))],
         sn::HW_REVISION_GET => one(u16_at(d, 0).map(Update::HwRevision)),
         sn::COMPONENT_VERSIONS_GET => vec![Update::ComponentVersions(d.to_vec())],
-        sn::BATTERY_LEVEL_GET => one(d.first().map(|&v| Update::Battery((v <= 100).then_some(v)))),
-        sn::CHARGING_STATE_GET => one(d
-            .first()
-            .and_then(|&v| ChargingState::from_u8(v))
-            .map(Update::Charging)),
+        sn::BATTERY_LEVEL_GET => battery(d),
+        // earbuds send one state per bud; either one charging counts (`mapGaia3ChargingState`)
+        sn::CHARGING_STATE_GET => one(if d.contains(&ChargingState::Charging.to_u8()) {
+            Some(Update::Charging(ChargingState::Charging))
+        } else {
+            d.first()
+                .and_then(|&v| ChargingState::from_u8(v))
+                .map(Update::Charging)
+        }),
         sn::TIMER_GET if d.len() >= 3 => vec![Update::Timer {
             id: d[0],
             seconds: u16_at(d, 1).unwrap(),
@@ -272,6 +305,7 @@ impl Request {
             SetAncStatus(v) => vec![Update::AncStatus(*v)],
             SetTransparency(v) => vec![Update::Transparency((*v).min(100))],
             SetPauseOnFullTransparency(v) => vec![Update::PauseOnFullTransparency(*v)],
+            SetTransparentHearingStatus(v) => vec![Update::TransparentHearingStatus(*v)],
             SetSidetone(v) => vec![Update::Sidetone(*v)],
             SetAudioMode(m) => vec![Update::AudioMode(*m)],
             SetPromptMode(m) => vec![Update::PromptMode(*m)],
@@ -316,6 +350,39 @@ mod tests {
         let p = Deframer::new().push(&bytes);
         assert_eq!(p.len(), 1, "{hex}");
         decode(&p[0], req)
+    }
+
+    #[test]
+    fn decodes_earbud_battery() {
+        let buds = |l, r, case| {
+            Update::Earbuds(EarbudBattery {
+                left: l,
+                right: r,
+                case,
+            })
+        };
+        // left 80, right 65, case 40
+        assert_eq!(
+            rx("FF 03 00 03 04 95 07 03 50 41 28", None),
+            vec![
+                Update::Battery(Some(65)),
+                buds(Some(80), Some(65), Some(40))
+            ]
+        );
+        // right bud in the case (0), no case value
+        assert_eq!(
+            rx("FF 03 00 02 04 95 07 03 50 00", None),
+            vec![Update::Battery(Some(80)), buds(Some(80), None, None)]
+        );
+        assert_eq!(
+            rx("FF 03 00 03 04 95 07 03 FF FF FF", None),
+            vec![Update::Battery(None), buds(None, None, None)]
+        );
+        // either bud charging
+        assert_eq!(
+            rx("FF 03 00 02 04 95 07 02 00 01", None),
+            vec![Update::Charging(ChargingState::Charging)]
+        );
     }
 
     /// Real responses captured from a MOMENTUM 4 (fw 3.38.3) during Phase 0.

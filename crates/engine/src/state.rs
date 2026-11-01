@@ -2,19 +2,26 @@
 
 use protocol::eq::BANDS;
 use protocol::{
-    AntiWind, AudioMode, BtMode, Capabilities, ChargingState, Codec, PersonalizedSoundMode,
-    PhysicalState, PromptMode, Update, Version,
+    AntiWind, AudioMode, BtMode, Capabilities, ChargingState, Codec, EarbudBattery, NoiseStyle,
+    PersonalizedSoundMode, PhysicalState, Product, PromptMode, Update, Version,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// Smart Control Plus "NoiseControl" variant 2 modes for the M4 (`products/m4` config: adaptive, custom, off).
+/// Noise-control modes. The M4 uses Smart Control Plus "NoiseControl" variant 2 (`products/m4` config: adaptive,
+/// custom, off); the other products use the official app's tiles (see `protocol::NoiseStyle`).
 pub enum NoiseMode {
     /// ANC on, adaptive ANC (mode pair 3 = 1); the headset manages the level itself.
     Adaptive,
     /// ANC on, adaptive off; the user picks the noise-cancelling ⟷ transparency balance (`ANC_Transparency`).
     Custom,
-    /// `ANC_Status = 0` (fw ≥ 2.13.32).
+    /// `ANC_Status = 0` (M4 fw ≥ 2.13.32, true wireless earbuds).
     Off,
+    /// Plain noise cancelling.
+    Anc,
+    /// Noise cancelling with wind noise reduction ("ANC outdoor").
+    Outdoor,
+    /// Transparent hearing.
+    Transparency,
 }
 
 impl NoiseMode {
@@ -23,6 +30,9 @@ impl NoiseMode {
             NoiseMode::Adaptive => "Adaptive",
             NoiseMode::Custom => "Custom",
             NoiseMode::Off => "Off",
+            NoiseMode::Anc => "ANC",
+            NoiseMode::Outdoor => "Outdoor",
+            NoiseMode::Transparency => "Transparency",
         }
     }
 }
@@ -46,18 +56,23 @@ pub struct PairedHost {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct HeadsetState {
+    pub product: Product,
     pub firmware: Option<Version>,
     pub model_id: Option<String>,
     pub serial: Option<String>,
     pub hw_revision: Option<u16>,
     pub sample_rate: Option<u32>,
     pub battery: Option<u8>,
+    /// Per-bud and case levels (true wireless earbuds only).
+    pub earbuds: Option<EarbudBattery>,
     pub charging: Option<ChargingState>,
     pub codec: Option<Codec>,
     pub anti_wind: Option<AntiWind>,
     pub adaptive: Option<bool>,
     pub anc_status: Option<bool>,
     pub transparency: Option<u8>,
+    /// `TransparentHearing_Status` (products without the M4's transparency balance).
+    pub transparent_hearing: Option<bool>,
     pub sidetone: Option<u8>,
     pub audio_mode: Option<AudioMode>,
     /// Audio mode before podcast mode was switched on, restored when it is switched off (as Smart Control Plus does).
@@ -83,30 +98,76 @@ pub struct HeadsetState {
     pub eq1_level_shift_x10: Option<i8>,
 }
 
-pub const SIDETONE_MAX: u8 = 4;
-
 impl HeadsetState {
     pub fn charging_now(&self) -> bool {
         self.charging == Some(ChargingState::Charging)
     }
 
-    /// Current noise mode. `ANC_Status = off` wins; otherwise the adaptive flag decides (the headset ignores
-    /// transparency while adaptive is on — verified on fw 3.38.3).
-    pub fn noise_mode(&self) -> Option<NoiseMode> {
-        if self.caps.anc_off && self.anc_status == Some(false) {
-            return Some(NoiseMode::Off);
-        }
-        self.adaptive.map(|a| {
-            if a {
-                NoiseMode::Adaptive
-            } else {
-                NoiseMode::Custom
+    /// The noise modes this product offers, in display order.
+    pub fn noise_modes(&self) -> Vec<NoiseMode> {
+        use NoiseMode as M;
+        match self.caps.noise {
+            NoiseStyle::None => vec![],
+            NoiseStyle::AdaptiveBalance if self.caps.anc_off => {
+                vec![M::Adaptive, M::Custom, M::Off]
             }
-        })
+            NoiseStyle::AdaptiveBalance => vec![M::Adaptive, M::Custom],
+            NoiseStyle::AncOrTransparency => vec![M::Anc, M::Transparency],
+            NoiseStyle::AncTile => vec![M::Off, M::Anc, M::Outdoor],
+            NoiseStyle::SportTile => vec![M::Anc, M::Outdoor, M::Transparency],
+        }
+    }
+
+    /// Current noise mode, read the way the official app reads it.
+    pub fn noise_mode(&self) -> Option<NoiseMode> {
+        let wind = || {
+            self.anti_wind.map(|w| {
+                if w == AntiWind::Off {
+                    NoiseMode::Anc
+                } else {
+                    NoiseMode::Outdoor
+                }
+            })
+        };
+        match self.caps.noise {
+            NoiseStyle::None => None,
+            // `ANC_Status = off` wins; otherwise the adaptive flag decides (the headset ignores transparency while
+            // adaptive is on — verified on fw 3.38.3)
+            NoiseStyle::AdaptiveBalance => {
+                if self.caps.anc_off && self.anc_status == Some(false) {
+                    return Some(NoiseMode::Off);
+                }
+                self.adaptive.map(|a| {
+                    if a {
+                        NoiseMode::Adaptive
+                    } else {
+                        NoiseMode::Custom
+                    }
+                })
+            }
+            NoiseStyle::AncOrTransparency => self.transparent_hearing.map(|t| {
+                if t {
+                    NoiseMode::Transparency
+                } else {
+                    NoiseMode::Anc
+                }
+            }),
+            NoiseStyle::AncTile => match self.anc_status? {
+                false => Some(NoiseMode::Off),
+                true => wind(),
+            },
+            NoiseStyle::SportTile => match self.transparent_hearing? {
+                true => Some(NoiseMode::Transparency),
+                false => wind(),
+            },
+        }
     }
 
     pub fn variant(&self) -> Option<&str> {
-        self.model_id.as_deref().and_then(protocol::m4_variant)
+        self.model_id
+            .as_deref()
+            .and_then(Product::from_model_id)
+            .map(|(_, v)| v)
     }
 
     /// Smart Control Plus "Hi-Res 24 bit/96 kHz" (= `BluetoothCompatibilityMode` better audio).
@@ -139,9 +200,15 @@ impl HeadsetState {
     pub fn apply(&mut self, u: &Update) -> bool {
         let before = self.clone();
         match u {
+            Update::Product(p) => {
+                self.product = *p;
+                if let Some(v) = self.firmware {
+                    self.caps = Capabilities::new(*p, v);
+                }
+            }
             Update::FirmwareVersion(v) => {
                 self.firmware = Some(*v);
-                self.caps = Capabilities::for_m4(*v);
+                self.caps = Capabilities::new(self.product, *v);
                 if self.eq.max_db == 0.0 {
                     self.eq.min_db = protocol::eq::MIN_GAIN_DB;
                     self.eq.max_db = protocol::eq::MAX_GAIN_DB;
@@ -152,6 +219,8 @@ impl HeadsetState {
             Update::HwRevision(h) => self.hw_revision = Some(*h),
             Update::SampleRate(r) => self.sample_rate = Some(*r),
             Update::Battery(b) => self.battery = *b,
+            Update::Earbuds(e) => self.earbuds = Some(*e),
+            Update::TransparentHearingStatus(t) => self.transparent_hearing = Some(*t),
             Update::Charging(c) => self.charging = Some(*c),
             Update::Codec(c) => self.codec = *c,
             Update::AntiWind(a) => self.anti_wind = Some(*a),
@@ -207,7 +276,7 @@ impl HeadsetState {
             }
             Update::Eq1Params(p) if p.first() == Some(&5) => {
                 if let Some(g) = protocol::eq::gen1_decode(
-                    &protocol::eq::M4_GEN1,
+                    self.product.gen1_params(),
                     self.eq1_level_shift_x10.unwrap_or(0),
                     self.eq.bass_boost,
                     p,
@@ -267,13 +336,15 @@ pub enum LinkState {
 pub struct DeviceEntry {
     pub id: String,
     pub name: String,
+    /// From the Bluetooth name; the session refines it from the model id.
+    pub product: Product,
     pub address: String,
     pub connected: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct AppState {
-    /// Supported (MOMENTUM 4) headsets paired with Windows.
+    /// Supported headsets (see `protocol::Product`) paired with Windows.
     pub devices: Vec<DeviceEntry>,
     pub active: Option<String>,
     pub link: LinkState,
@@ -322,6 +393,8 @@ pub enum Action {
     /// Custom-mode balance: 0 = full noise cancelling, 50 = neutral, 100 = full transparency (`ANC_Transparency`).
     SetTransparency(u8),
     SetAntiWind(AntiWind),
+    /// The separate transparent hearing switch (`Capabilities::transparency_switch`).
+    SetTransparentHearing(bool),
     SetSidetone(u8),
     SetEqBands([f32; BANDS]),
     SetBassBoost(bool),

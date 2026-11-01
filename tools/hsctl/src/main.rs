@@ -8,7 +8,7 @@
 //!   hsctl eq
 //!   hsctl raw <hex bytes of vendor+id+payload, e.g. "04 95 12 01"> [--unsafe]
 //!
-//! Options: --device <name substring>   (default: first connected MOMENTUM 4)
+//! Options: --device <name substring>   (default: first connected supported headset)
 //! Set RUST_LOG=trace to see every frame.
 
 use std::process::ExitCode;
@@ -141,7 +141,7 @@ fn open(device_filter: Option<&str>, allow_dangerous: bool) -> Result<Session, S
         .iter()
         .filter(|d| match device_filter {
             Some(f) => d.name.to_lowercase().contains(&f.to_lowercase()),
-            None => protocol::is_m4_name(&d.name),
+            None => protocol::Product::from_bt_name(&d.name).is_some(),
         })
         .max_by_key(|d| d.connected)
         .ok_or("no matching paired device")?;
@@ -204,11 +204,9 @@ fn run() -> Result<(), String> {
     match cmd {
         "scan" => {
             for d in bluetooth::paired_devices().map_err(|e| e.to_string())? {
-                let tag = if protocol::is_m4_name(&d.name) {
-                    "  <- MOMENTUM 4"
-                } else {
-                    ""
-                };
+                let tag = protocol::Product::from_bt_name(&d.name)
+                    .map(|p| format!("  <- {}", p.name()))
+                    .unwrap_or_default();
                 println!(
                     "{:<32} {:<18} connected={:<5}{tag}",
                     d.name, d.address, d.connected

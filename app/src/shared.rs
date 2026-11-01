@@ -92,6 +92,33 @@ pub const WIND_ORDER: [protocol::AntiWind; 3] = [
     protocol::AntiWind::Max,
 ];
 pub const SIDETONE_LABELS: [&str; 5] = ["Off", "Low", "Medium", "High", "Max"];
+
+/// Sidetone steps for a product whose highest step is `max` (`Capabilities::sidetone_max`).
+pub fn sidetone_labels(max: u8) -> &'static [&'static str] {
+    match max {
+        0 => &[],
+        1 => &["Off", "On"],
+        2 => &["Off", "Low", "High"],
+        3 => &["Off", "Low", "Medium", "High"],
+        _ => &SIDETONE_LABELS,
+    }
+}
+
+/// Hint under the noise-control modes.
+pub fn noise_mode_hint(mode: engine::NoiseMode, style: protocol::NoiseStyle) -> &'static str {
+    use engine::NoiseMode as M;
+    match mode {
+        M::Adaptive => "Noise cancelling adjusts itself to your surroundings.",
+        M::Custom => "",
+        M::Off if style == protocol::NoiseStyle::AdaptiveBalance => {
+            "Noise cancelling and transparency are off. Saves a little battery."
+        }
+        M::Off => "Noise cancelling is off.",
+        M::Anc => "Blocks out the noise around you.",
+        M::Outdoor => "Noise cancelling that also reduces wind noise.",
+        M::Transparency => "Lets you hear your surroundings.",
+    }
+}
 pub const PROMPTS_TITLE: &str = "Tones and voice prompts";
 pub const SIDETONE_TITLE: &str = "Sidetone";
 pub const COMFORT_CALLS_TITLE: &str = "Comfort calls";

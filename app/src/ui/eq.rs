@@ -1,15 +1,21 @@
 //! 5-band EQ editor and preset helpers.
 
 use egui::{Align2, Color32, CornerRadius, Mesh, Pos2, Rect, Sense, Shape, Stroke, Ui, pos2, vec2};
-use protocol::eq::{BAND_LABELS, BANDS, PRESETS};
+use protocol::Product;
+use protocol::eq::{BAND_LABELS, BANDS};
 
 use super::theme::{Palette, regular, semibold};
 use crate::settings::CustomPreset;
 
 /// Name of the preset (built-in or custom) matching `bands`, if any.
-pub fn matching_preset(bands: &[f32; BANDS], custom: &[CustomPreset]) -> Option<String> {
+pub fn matching_preset(
+    product: Product,
+    bands: &[f32; BANDS],
+    custom: &[CustomPreset],
+) -> Option<String> {
     let eq = |a: &[f32; BANDS]| a.iter().zip(bands).all(|(x, y)| (x - y).abs() < 0.051);
-    PRESETS
+    product
+        .presets()
         .iter()
         .find(|(_, b)| eq(b))
         .map(|(n, _)| n.to_string())
@@ -51,7 +57,7 @@ pub fn eq_choice(
         return Some(EqChoice::Neutral);
     }
     Some(
-        matching_preset(bands, user)
+        matching_preset(h.product, bands, user)
             .map(EqChoice::Preset)
             .unwrap_or(EqChoice::Custom),
     )

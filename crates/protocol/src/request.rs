@@ -32,6 +32,9 @@ pub enum Request {
     SetTransparency(u8),
     PauseOnFullTransparency,
     SetPauseOnFullTransparency(bool),
+    /// `TransparentHearing_Status`: transparent hearing on/off (ACCENTUM, MOMENTUM True Wireless/Sport).
+    TransparentHearingStatus,
+    SetTransparentHearingStatus(bool),
     Sidetone,
     SetSidetone(u8),
     // audio & behaviour
@@ -128,6 +131,8 @@ impl Request {
             SetTransparency(level) => s(sn::ANC_TRANSPARENCY_SET, vec![(*level).min(100)]),
             PauseOnFullTransparency => g(sn::TH_PAUSE_ON_FULL_GET),
             SetPauseOnFullTransparency(on) => s(sn::TH_PAUSE_ON_FULL_SET, vec![b(*on)]),
+            TransparentHearingStatus => g(sn::TH_STATUS_GET),
+            SetTransparentHearingStatus(on) => s(sn::TH_STATUS_SET, vec![b(*on)]),
             Sidetone => g(sn::SIDETONE_GET),
             SetSidetone(v) => s(sn::SIDETONE_SET, vec![*v]),
             Codec => g(sn::CODEC_GET),

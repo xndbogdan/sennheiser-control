@@ -33,11 +33,9 @@ pub fn set_autostart(enable: bool) -> std::io::Result<()> {
     let key =
         RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(RUN_KEY, KEY_READ | KEY_WRITE)?;
     if enable {
+        // whether login opens the window is the "Start minimized" setting, read at startup
         let exe = std::env::current_exe()?;
-        key.set_value(
-            crate::APP_DIR,
-            &format!("\"{}\" --minimized", exe.display()),
-        )
+        key.set_value(crate::APP_DIR, &format!("\"{}\"", exe.display()))
     } else {
         match key.delete_value(crate::APP_DIR) {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -227,10 +225,7 @@ mod tests {
             .unwrap()
             .get_value(crate::APP_DIR)
             .unwrap();
-        assert!(
-            cmd.ends_with("\" --minimized") && cmd.starts_with('"'),
-            "{cmd}"
-        );
+        assert!(cmd.ends_with('"') && cmd.starts_with('"'), "{cmd}");
         super::set_autostart(false).unwrap();
         assert!(!super::autostart_enabled());
         super::set_autostart(before).unwrap();

@@ -5,7 +5,7 @@ use std::time::Instant;
 use egui::{Align, Align2, CornerRadius, Layout, RichText, Sense, Ui, pos2, vec2};
 use egui_phosphor::regular as ph;
 use engine::{Action, HeadsetState, LinkState, NoiseMode};
-use protocol::{EqGen, PromptMode, eq::PRESETS};
+use protocol::{EqGen, Product, PromptMode};
 
 use super::eq::EqChoice;
 use super::theme::{Palette, bold, icon, regular, semibold};
@@ -13,8 +13,8 @@ use super::widgets::{self as w, card, section_title, setting_row, stacked_row, t
 use super::{HOST_PENDING_TIMEOUT, HeadsetApp, HostPending, Pending};
 use crate::settings::{CustomPreset, ThemePref};
 use crate::shared::{
-    COMFORT_CALLS_TITLE, PROMPTS_TITLE, SIDETONE_LABELS, SIDETONE_TITLE, WIND_ORDER,
-    custom_level_label,
+    COMFORT_CALLS_TITLE, PROMPTS_TITLE, SIDETONE_TITLE, WIND_ORDER, custom_level_label,
+    noise_mode_hint, sidetone_labels,
 };
 
 const AUTO_OFF_LABELS: [&str; 4] = ["Never", "15 min", "30 min", "60 min"];
@@ -41,7 +41,7 @@ impl HeadsetApp {
             return;
         }
         let Some(active) = st.active_device().cloned() else {
-            self.empty_state(ui, "No MOMENTUM 4 paired", "Pair your headset in Windows Bluetooth settings. It will show up here automatically.");
+            self.empty_state(ui, "No supported headset paired", "Pair your Sennheiser headset in Windows Bluetooth settings. It will show up here automatically.");
             return;
         };
         if !active.connected {
@@ -211,6 +211,16 @@ impl HeadsetApp {
                                 if let Some(c) = h.codec {
                                     w::chip(ui, &p, Some(ph::WAVEFORM), c.label());
                                 }
+                                if let Some(e) = h.earbuds {
+                                    let pct = |v: Option<u8>| {
+                                        v.map_or("—".to_string(), |v| format!("{v}%"))
+                                    };
+                                    let buds = format!("L {} · R {}", pct(e.left), pct(e.right));
+                                    w::chip(ui, &p, None, &buds);
+                                    if e.case.is_some() {
+                                        w::chip(ui, &p, None, &format!("Case {}", pct(e.case)));
+                                    }
+                                }
                                 if let Some(sr) = h.sample_rate {
                                     let khz = sr as f32 / 1000.0;
                                     // The headset reports 0 while nothing is playing.
@@ -292,35 +302,53 @@ impl HeadsetApp {
 
     fn noise_card(&mut self, ui: &mut Ui, h: &HeadsetState) {
         let p = self.palette;
+        let c = h.caps;
+        // the M4 follows Smart Control Plus "NoiseControl" variant 2 (adaptive, custom, off from fw 2.13.32); the
+        // other products follow their tile in the official app
+        let modes = h.noise_modes();
+        if modes.is_empty() && !c.anti_wind && !c.transparency_switch {
+            return;
+        }
         card(ui, &p, |ui| {
             section_title(ui, &p, ph::EAR, "Noise control");
-            // Smart Control Plus "NoiseControl" variant 2: adaptive, custom, and off from fw 2.13.32
-            let mut modes = vec![NoiseMode::Adaptive, NoiseMode::Custom];
-            if h.caps.anc_off {
-                modes.push(NoiseMode::Off);
-            }
             let labels: Vec<&str> = modes.iter().map(|m| m.label()).collect();
             let mode = h.noise_mode();
-            let sel = mode.and_then(|m| modes.iter().position(|x| *x == m));
-            if let Some(i) = w::segmented(ui, &p, "noise-mode", &labels, sel, mode.is_some(), 36.0)
-            {
-                self.transparency = None;
-                self.act(Action::SetNoiseMode(modes[i]));
+            if !modes.is_empty() {
+                let sel = mode.and_then(|m| modes.iter().position(|x| *x == m));
+                if let Some(i) =
+                    w::segmented(ui, &p, "noise-mode", &labels, sel, mode.is_some(), 36.0)
+                {
+                    self.transparency = None;
+                    self.act(Action::SetNoiseMode(modes[i]));
+                }
+                ui.add_space(2.0);
+                match mode {
+                    Some(NoiseMode::Custom) => self.custom_balance(ui, h),
+                    Some(m) => hint(ui, &p, noise_mode_hint(m, c.noise)),
+                    None => {}
+                }
             }
-            ui.add_space(2.0);
-            match mode {
-                Some(NoiseMode::Custom) => self.custom_balance(ui, h),
-                Some(NoiseMode::Adaptive) => hint(
+            if c.transparency_switch {
+                if !modes.is_empty() {
+                    w::divider(ui, &p);
+                }
+                let mut th = h.transparent_hearing == Some(true);
+                setting_row(
                     ui,
                     &p,
-                    "Noise cancelling adjusts itself to your surroundings.",
-                ),
-                Some(NoiseMode::Off) => hint(
-                    ui,
-                    &p,
-                    "Noise cancelling and transparency are off. Saves a little battery.",
-                ),
-                None => {}
+                    ph::EAR,
+                    "Transparent hearing",
+                    Some("Hear your surroundings"),
+                    h.transparent_hearing.is_some(),
+                    |ui| {
+                        if toggle(ui, &p, &mut th, h.transparent_hearing.is_some()).changed() {
+                            self.act(Action::SetTransparentHearing(th));
+                        }
+                    },
+                );
+            }
+            if !c.anti_wind {
+                return;
             }
             w::divider(ui, &p);
             let wind_sel = h
@@ -396,59 +424,63 @@ impl HeadsetApp {
 
     fn calls_card(&mut self, ui: &mut Ui, h: &HeadsetState) {
         let p = self.palette;
-        let on_head = h.on_head_detection == Some(true);
+        let c = h.caps;
+        if !c.comfort_call && !c.auto_answer_calls && c.sidetone_max == 0 {
+            return;
+        }
+        // with on-head detection, auto-answer works by putting the headphones on; without it, it's a plain switch
+        let answer_ok = !c.on_head_detection || h.on_head_detection == Some(true);
         card(ui, &p, |ui| {
             section_title(ui, &p, ph::PHONE, "Calls");
-            let mut cc = h.comfort_call == Some(true);
-            setting_row(
-                ui,
-                &p,
-                ph::USERS_THREE,
-                COMFORT_CALLS_TITLE,
-                Some("Hear your surroundings during calls"),
-                h.comfort_call.is_some(),
-                |ui| {
-                    if toggle(ui, &p, &mut cc, h.comfort_call.is_some()).changed() {
-                        self.act(Action::SetComfortCall(cc));
-                    }
-                },
-            );
-            if h.caps.on_head_detection && h.caps.auto_answer_calls {
+            if c.comfort_call {
+                let mut cc = h.comfort_call == Some(true);
+                setting_row(
+                    ui,
+                    &p,
+                    ph::USERS_THREE,
+                    COMFORT_CALLS_TITLE,
+                    Some("Hear your surroundings during calls"),
+                    h.comfort_call.is_some(),
+                    |ui| {
+                        if toggle(ui, &p, &mut cc, h.comfort_call.is_some()).changed() {
+                            self.act(Action::SetComfortCall(cc));
+                        }
+                    },
+                );
+            }
+            if c.auto_answer_calls {
                 let mut ac = h.auto_call == Some(true);
                 setting_row(
                     ui,
                     &p,
                     ph::PHONE_INCOMING,
                     "Auto-answer calls",
-                    Some(if on_head {
+                    Some(if !c.on_head_detection {
+                        "Answer incoming calls automatically"
+                    } else if answer_ok {
                         "Answer by putting the headphones on"
                     } else {
                         "Needs on-head detection"
                     }),
-                    on_head,
+                    answer_ok,
                     |ui| {
-                        if toggle(ui, &p, &mut ac, on_head).changed() {
+                        if toggle(ui, &p, &mut ac, answer_ok).changed() {
                             self.act(Action::SetAutoCall(ac));
                         }
                     },
                 );
             }
-            stacked_row(ui, &p, ph::MICROPHONE, SIDETONE_TITLE, None, |ui| {
-                let sel = h
-                    .sidetone
-                    .map(|v| v.min(engine::state::SIDETONE_MAX) as usize);
-                if let Some(i) = w::segmented(
-                    ui,
-                    &p,
-                    "sidetone",
-                    &SIDETONE_LABELS,
-                    sel,
-                    h.sidetone.is_some(),
-                    30.0,
-                ) {
-                    self.act(Action::SetSidetone(i as u8));
-                }
-            });
+            if c.sidetone_max > 0 {
+                let labels = sidetone_labels(c.sidetone_max);
+                stacked_row(ui, &p, ph::MICROPHONE, SIDETONE_TITLE, None, |ui| {
+                    let sel = h.sidetone.map(|v| v.min(c.sidetone_max) as usize);
+                    if let Some(i) =
+                        w::segmented(ui, &p, "sidetone", labels, sel, h.sidetone.is_some(), 30.0)
+                    {
+                        self.act(Action::SetSidetone(i as u8));
+                    }
+                });
+            }
         });
     }
 
@@ -472,11 +504,12 @@ impl HeadsetApp {
                 },
             );
             if h.caps.eq == EqGen::Unsupported {
-                ui.label(
-                    RichText::new("The equalizer needs headset firmware 2.12 or newer.")
-                        .font(regular(13.0))
-                        .color(p.text_dim),
-                );
+                let text = if h.product == Product::Momentum4 {
+                    "The equalizer needs headset firmware 2.12 or newer."
+                } else {
+                    "The equalizer needs newer headset firmware."
+                };
+                ui.label(RichText::new(text).font(regular(13.0)).color(p.text_dim));
                 return;
             }
             w::divider(ui, &p);
@@ -508,14 +541,16 @@ impl HeadsetApp {
                 ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
                 let mut apply = None;
                 let mut delete = None;
-                if preset_chip(ui, &p, "Neutral", selected(&EqChoice::Neutral), enabled)
-                    .on_hover_text("The headset's own tuning, equalizer off")
-                    .clicked()
+                // older audio-mode firmware has no "EQ off" mode
+                if h.caps.eq_off
+                    && preset_chip(ui, &p, "Neutral", selected(&EqChoice::Neutral), enabled)
+                        .on_hover_text("The headset's own tuning, equalizer off")
+                        .clicked()
                 {
                     self.eq_bands = None;
                     self.act(Action::SetEqEnabled(false));
                 }
-                for (name, preset) in PRESETS {
+                for (name, preset) in h.product.presets() {
                     let c = EqChoice::Preset(name.to_string());
                     if preset_chip(ui, &p, name, selected(&c), enabled).clicked() {
                         apply = Some(*preset);
@@ -575,7 +610,8 @@ impl HeadsetApp {
                     self.act(Action::SetEqBands(bands));
                 }
                 if edit.released
-                    && super::eq::matching_preset(&bands, &self.settings.custom_presets).is_none()
+                    && super::eq::matching_preset(h.product, &bands, &self.settings.custom_presets)
+                        .is_none()
                 {
                     self.shared.update_settings(|s| s.custom_eq = Some(bands));
                 }
@@ -707,31 +743,41 @@ impl HeadsetApp {
     fn hi_res_row(&mut self, ui: &mut Ui, h: &HeadsetState) {
         let p = self.palette;
         let mut on = h.hi_res() == Some(true);
-        setting_row(
-            ui,
-            &p,
-            ph::WAVEFORM,
-            "Hi-Res 24 bit/96 kHz",
-            Some("High resolution audio if supported by the source"),
-            true,
-            |ui| {
-                if toggle(ui, &p, &mut on, !self.confirm_hi_res).changed() {
-                    if on {
-                        // Smart Control Plus asks for confirmation before enabling
-                        self.confirm_hi_res = true;
-                    } else {
-                        self.act(Action::SetHiRes(false));
-                    }
+        // Smart Control Plus wording for the M4; the old app calls the same switch "better audio quality"
+        let (title, subtitle) = if h.product == Product::Momentum4 {
+            (
+                "Hi-Res 24 bit/96 kHz",
+                "High resolution audio if supported by the source",
+            )
+        } else {
+            (
+                "Better audio quality",
+                "Prefer high quality codecs over connection stability",
+            )
+        };
+        setting_row(ui, &p, ph::WAVEFORM, title, Some(subtitle), true, |ui| {
+            if toggle(ui, &p, &mut on, !self.confirm_hi_res).changed() {
+                if on {
+                    // Smart Control Plus asks for confirmation before enabling
+                    self.confirm_hi_res = true;
+                } else {
+                    self.act(Action::SetHiRes(false));
                 }
-            },
-        );
+            }
+        });
         if self.confirm_hi_res {
             confirm_box(
                 ui,
                 &p,
                 ph::WARNING,
-                "Enabling Hi-Res",
-                "Hi-Res 24 bit/96 kHz will allow you to use high quality sound codecs, but might give a less stable Bluetooth connection, which increases the likelihood of dropouts.",
+                &if h.product == Product::Momentum4 {
+                    "Enabling Hi-Res".to_string()
+                } else {
+                    format!("Enabling {title}")
+                },
+                &format!(
+                    "{title} will allow you to use high quality sound codecs, but might give a less stable Bluetooth connection, which increases the likelihood of dropouts."
+                ),
                 |ui| {
                     if w::primary_button(ui, &p, None, "I understand").clicked() {
                         self.confirm_hi_res = false;
@@ -751,6 +797,22 @@ impl HeadsetApp {
         card(ui, &p, |ui| {
             section_title(ui, &p, ph::SLIDERS_HORIZONTAL, "Headset");
             let on_head = h.on_head_detection == Some(true);
+            if c.smart_pause && !c.on_head_detection {
+                let mut sp = h.smart_pause == Some(true);
+                setting_row(
+                    ui,
+                    &p,
+                    ph::PAUSE,
+                    "Smart pause",
+                    Some("Pause when you take an earbud out"),
+                    h.smart_pause.is_some(),
+                    |ui| {
+                        if toggle(ui, &p, &mut sp, h.smart_pause.is_some()).changed() {
+                            self.act(Action::SetSmartPause(sp));
+                        }
+                    },
+                );
+            }
             if c.on_head_detection {
                 let mut v = on_head;
                 setting_row(
@@ -794,6 +856,8 @@ impl HeadsetApp {
                     "Lock touch controls",
                     Some(if c.touch_lock_persists {
                         "Ignore touches; stays locked after a restart"
+                    } else if h.product.is_earbuds() {
+                        "Ignore taps and swipes on the earbuds"
                     } else {
                         "Ignore taps and swipes on the earcup"
                     }),
@@ -805,11 +869,14 @@ impl HeadsetApp {
                     },
                 );
             }
-            if expander(ui, &p, ph::HAND_TAP, "Touch gestures", self.show_gestures) {
-                self.show_gestures = !self.show_gestures;
-            }
-            if self.show_gestures {
-                gesture_reference(ui, &p);
+            // the gesture map is the M4's; other products' maps aren't in this app
+            if h.product == Product::Momentum4 {
+                if expander(ui, &p, ph::HAND_TAP, "Touch gestures", self.show_gestures) {
+                    self.show_gestures = !self.show_gestures;
+                }
+                if self.show_gestures {
+                    gesture_reference(ui, &p);
+                }
             }
             w::divider(ui, &p);
             if c.auto_power_off {
@@ -1016,6 +1083,7 @@ impl HeadsetApp {
                 });
             };
             let dash = || "—".to_string();
+            row(ui, "Product", h.product.name().to_string());
             row(ui, "Model", h.model_id.clone().unwrap_or_else(dash));
             row(
                 ui,
@@ -1174,7 +1242,7 @@ impl HeadsetApp {
             ui.label(RichText::new(format!("{} {}", crate::APP_NAME, env!("CARGO_PKG_VERSION"))).font(semibold(12.0)).color(p.text_dim));
             ui.add(
                 egui::Label::new(
-                    RichText::new("Unofficial companion for the Sennheiser MOMENTUM 4. Not affiliated with or endorsed by Sennheiser or Sonova.")
+                    RichText::new("Unofficial companion for Sennheiser headphones. Not affiliated with or endorsed by Sennheiser or Sonova.")
                         .font(regular(11.5))
                         .color(p.text_faint),
                 )
