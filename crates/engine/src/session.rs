@@ -7,8 +7,7 @@ use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, select, unbounded};
 use parking_lot::Mutex;
-use protocol::ids::feature;
-use protocol::{Capabilities, EqGen, NoiseStyle, Product, Request, Update, decode};
+use protocol::{Capabilities, Product, Request, Update, decode};
 
 use crate::client::{Client, ClientError, Unsolicited};
 use crate::transport::Transport;
@@ -25,11 +24,7 @@ pub enum SessionEvent {
     Ended(Option<String>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Priority {
-    High,
-    Low,
-}
+pub use headset::Priority;
 
 pub type Connector = Arc<
     dyn Fn(&str) -> Result<(Arc<dyn Transport>, Receiver<bluetooth::LinkEvent>), String>
@@ -150,7 +145,7 @@ impl Worker {
             return self.emit(SessionEvent::Failed(e));
         }
         self.emit(SessionEvent::Connected);
-        let refresh = self.refresh_requests();
+        let refresh = headset::refresh_requests(&self.caps);
         let reason = match self.execute(&client, &refresh) {
             Err(reason) => reason,
             Ok(()) => self.job_loop(&client),
@@ -226,82 +221,6 @@ impl Worker {
         Ok(())
     }
 
-    fn refresh_requests(&self) -> Vec<Request> {
-        let c = &self.caps;
-        let mut r = vec![];
-        let mut features = vec![
-            feature::DEVICE,
-            feature::BATTERY,
-            feature::GENERIC_AUDIO,
-            feature::DEVICE_MANAGEMENT,
-        ];
-        features.extend([feature::MMI, feature::TRANSPARENT_HEARING, feature::ANC]);
-        if c.eq == EqGen::Gen2 {
-            features.push(feature::USER_EQ);
-        }
-        if c.sound_personalization {
-            features.push(feature::PERSONALIZED_SOUND);
-        }
-        r.extend(features.into_iter().map(Request::RegisterNotifications));
-        r.extend([Request::Battery, Request::Charging, Request::Codec]);
-        r.extend(noise_reads(c));
-        r.push(Request::AudioMode);
-        if c.sidetone_max > 0 {
-            r.push(Request::Sidetone);
-        }
-        if c.comfort_call {
-            r.push(Request::ComfortCall);
-        }
-        if c.voice_prompts {
-            r.push(Request::PromptMode);
-        }
-        if c.on_head_detection {
-            r.push(Request::OnHeadDetection);
-        }
-        if c.smart_pause {
-            r.push(Request::SmartPause);
-        }
-        if c.auto_power_off {
-            r.push(Request::Timer(0));
-        }
-        if c.auto_answer_calls {
-            r.push(Request::AutoCall);
-        }
-        if c.touch_lock {
-            r.push(Request::TouchLock);
-        }
-        if c.hi_res_audio {
-            r.push(Request::BtMode);
-        }
-        if c.physical_state {
-            r.push(Request::PhysicalState);
-        }
-        if c.sound_personalization {
-            r.push(Request::PersonalizedSound);
-        }
-        match c.eq {
-            EqGen::Gen2 => {
-                r.push(Request::Eq2Config);
-                r.extend((0..protocol::eq::BANDS as u8).map(Request::Eq2Slider));
-                r.push(Request::Eq2SubMode);
-            }
-            EqGen::Gen1 => {
-                r.extend([
-                    Request::Eq1LevelShift,
-                    Request::Eq1Knob(protocol::eq::KNOB_Y_INDEX),
-                    Request::Eq1Params(protocol::eq::gen1_gain_query()),
-                ]);
-            }
-            EqGen::Unsupported => {}
-        }
-        r.extend([
-            Request::PairedOwnIndex,
-            Request::PairedMaxConnections,
-            Request::PairedCount,
-        ]);
-        r
-    }
-
     /// Execute requests in order. Returns Err(reason) when the link is gone.
     fn execute(&self, client: &Client, reqs: &[Request]) -> Result<(), Option<String>> {
         let mut timeouts = 0;
@@ -316,11 +235,9 @@ impl Worker {
                     let ups = decode(&p, Some(req));
                     let acked = ups.iter().any(|u| matches!(u, Update::Ack(_)));
                     // follow-ups the response makes possible
-                    if let Some(Update::PairedCount(n)) = ups.first() {
-                        for i in 0..(*n).min(8) as u8 {
-                            if let Ok(p) = client.request(&Request::PairedInfo(i)) {
-                                batch.extend(decode(&p, Some(&Request::PairedInfo(i))));
-                            }
+                    for f in ups.iter().flat_map(headset::follow_ups) {
+                        if let Ok(p) = client.request(&f) {
+                            batch.extend(decode(&p, Some(&f)));
                         }
                     }
                     batch.extend(ups);
@@ -346,7 +263,7 @@ impl Worker {
                     } else {
                         log::warn!("{}: {req:?}: {e}", self.product.name());
                     }
-                    if is_user_change(req) {
+                    if headset::is_user_change(req) {
                         self.emit(SessionEvent::CommandFailed(format!(
                             "The headset rejected this change ({e})"
                         )));
@@ -354,7 +271,7 @@ impl Worker {
                 }
                 Err(e) => {
                     log::warn!("{req:?}: {e}");
-                    if is_user_change(req) {
+                    if headset::is_user_change(req) {
                         self.emit(SessionEvent::CommandFailed(e.to_string()));
                     }
                 }
@@ -402,36 +319,6 @@ impl Worker {
     }
 }
 
-/// Reads behind the noise-control UI of a product (only what its tile uses, so an untested model's error log only
-/// shows unexpected rejections).
-pub(crate) fn noise_reads(c: &Capabilities) -> Vec<Request> {
-    use Request as R;
-    let mut r = match c.noise {
-        NoiseStyle::None => vec![],
-        NoiseStyle::AdaptiveBalance => vec![R::AncModes, R::AncStatus, R::Transparency],
-        NoiseStyle::AncOrTransparency => vec![R::TransparentHearingStatus],
-        NoiseStyle::AncTile => vec![R::AncStatus, R::AncModes],
-        NoiseStyle::SportTile => vec![R::AncModes, R::TransparentHearingStatus],
-    };
-    if c.anti_wind && !r.contains(&R::AncModes) {
-        r.push(R::AncModes);
-    }
-    if c.transparency_switch {
-        r.push(R::TransparentHearingStatus);
-    }
-    r
-}
-
-fn is_user_change(r: &Request) -> bool {
-    matches!(
-        r,
-        Request::PairedConnect(_)
-            | Request::PairedDisconnect(_)
-            | Request::PairedDeleteEntry(_)
-            | Request::FactoryReset
-    ) || format!("{r:?}").starts_with("Set")
-}
-
 /// Merge all queued high-priority jobs, keeping only the latest value for repeatable setters
 /// (slider drags produce many intermediate values).
 fn coalesce(first: Vec<Request>, rx: &Receiver<Vec<Request>>) -> Vec<Request> {
@@ -439,21 +326,7 @@ fn coalesce(first: Vec<Request>, rx: &Receiver<Vec<Request>>) -> Vec<Request> {
     while let Ok(more) = rx.try_recv() {
         all.extend(more);
     }
-    let key = |r: &Request| -> Option<(u16, u8)> {
-        let id = r.packet().id;
-        match r {
-            Request::SetEq2Slider { band, .. } => Some((id, *band)),
-            Request::SetAncMode { mode, .. } => Some((id, *mode)),
-            Request::SetTransparency(_)
-            | Request::SetSidetone(_)
-            | Request::SetEq2SubMode(_)
-            | Request::SetEq1Params(_)
-            | Request::SetEq1LevelShift(_)
-            | Request::SetEq1Knob { .. }
-            | Request::SetAudioMode(_) => Some((id, 0)),
-            _ => None,
-        }
-    };
+    let key = headset::coalesce_key;
     let mut out: Vec<Request> = Vec::with_capacity(all.len());
     for r in all {
         if let Some(k) = key(&r)
@@ -513,12 +386,5 @@ mod tests {
                 Request::SetSmartPause(true),
             ]
         );
-    }
-
-    #[test]
-    fn user_change_detection() {
-        assert!(is_user_change(&Request::SetTransparency(1)));
-        assert!(!is_user_change(&Request::Battery));
-        assert!(!is_user_change(&Request::Timer(0)));
     }
 }

@@ -1,6 +1,14 @@
 [workspace]
 resolver = "3"
-members = ["crates/protocol", "crates/bluetooth", "crates/engine", "app", "tools/hsctl"]
+members = [
+    "crates/protocol",
+    "crates/headset",
+    "crates/bluetooth",
+    "crates/engine",
+    "crates/web",
+    "app",
+    "tools/hsctl",
+]
 
 [workspace.package]
 version = "0.4.0"
@@ -10,6 +18,7 @@ publish = false
 
 [workspace.dependencies]
 protocol = { path = "crates/protocol" }
+headset = { path = "crates/headset" }
 bluetooth = { path = "crates/bluetooth" }
 engine = { path = "crates/engine" }
 thiserror = "2"
@@ -21,3 +30,9 @@ lto = "thin"
 codegen-units = 1
 strip = true
 opt-level = 3
+
+# the web app's wasm build (`pnpm core` in web/): small, and not stripped so wasm-bindgen can read its features
+[profile.wasm]
+inherits = "release"
+strip = false
+opt-level = "s"

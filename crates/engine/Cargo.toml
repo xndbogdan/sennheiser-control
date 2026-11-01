@@ -7,6 +7,7 @@ publish.workspace = true
 
 [dependencies]
 protocol.workspace = true
+headset.workspace = true
 bluetooth.workspace = true
 thiserror.workspace = true
 log.workspace = true

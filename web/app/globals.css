@@ -1,0 +1,142 @@
+@import "tailwindcss";
+
+/* Konsumr's calm dark palette; the LCD battery readout is borrowed from the resume site. */
+:root {
+  color-scheme: dark;
+  --background: oklch(0.1 0.005 260);
+  --foreground: oklch(0.93 0.01 260);
+  --card: oklch(0.14 0.007 260);
+  --muted: oklch(0.18 0.006 260);
+  --muted-foreground: oklch(0.6 0.01 260);
+  --faint: oklch(0.45 0.01 260);
+  --accent: oklch(0.22 0.012 260);
+  --border: oklch(0.22 0.008 260);
+  --primary: oklch(0.72 0.14 185);
+  --primary-foreground: oklch(0.12 0.02 185);
+  --warn: oklch(0.8 0.13 80);
+  --destructive: oklch(0.6 0.18 25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-warn: var(--warn);
+  --color-destructive: var(--destructive);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-lcd: var(--font-dseg14);
+  --animate-connect: connect-progress linear forwards;
+}
+
+@keyframes connect-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-primary/60;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(ellipse 100% 40% at 50% 0%, oklch(0.72 0.14 185 / 0.09) 0%, transparent 70%),
+      linear-gradient(oklch(0.12 0.004 260) 1px, transparent 1px),
+      linear-gradient(90deg, oklch(0.12 0.004 260) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      48px 48px,
+      48px 48px;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+.lcd-glow {
+  text-shadow:
+    0 0 2px currentColor,
+    0 0 6px currentColor;
+}
+
+/* native range inputs: thin track, round thumb, teal fill up to the value (--fill set inline) */
+.range {
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  --track: 4px;
+}
+.range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.range::-webkit-slider-runnable-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--primary) var(--fill, 0%), var(--accent) var(--fill, 0%));
+}
+.range::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: calc((var(--track) - 18px) / 2);
+  border-radius: 999px;
+  background: var(--foreground);
+  box-shadow: 0 0 0 4px oklch(0.72 0.14 185 / 0.25);
+}
+.range::-moz-range-track {
+  height: var(--track);
+  border-radius: 999px;
+  background: var(--accent);
+}
+.range::-moz-range-progress {
+  height: var(--track);
+  border-radius: 999px;
+  background: var(--primary);
+}
+.range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--foreground);
+}
+/* the balance slider is centred on "neutral": no fill */
+.range.centered::-webkit-slider-runnable-track {
+  background: var(--accent);
+}
+/* vertical EQ bands */
+.range.vertical {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 18px;
+}
+.range.vertical::-webkit-slider-runnable-track {
+  width: var(--track);
+  height: auto;
+  background: linear-gradient(to top, var(--accent) 0%, var(--accent) 100%);
+}
+.range.vertical::-webkit-slider-thumb {
+  margin-top: 0;
+  margin-left: calc((var(--track) - 18px) / 2);
+}

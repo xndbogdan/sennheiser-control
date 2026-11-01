@@ -16,14 +16,20 @@ cargo run -p hsctl -- info          # CLI: dump everything the headset reports
 ## Layout
 
 ```
-crates/protocol   GAIA framing, typed requests/updates, EQ math, capabilities (pure Rust, unit-tested)
+crates/protocol   GAIA framing, typed requests/updates, EQ math, products and capabilities (pure Rust, unit-tested)
+crates/headset    shared core: headset state, refresh reads, action -> GAIA writes, simulated MOMENTUM 4 (pure Rust)
 crates/bluetooth  WinRT device watcher + RFCOMM link
-crates/engine     GAIA client, session worker, engine actor, simulated MOMENTUM 4
+crates/engine     GAIA client, session worker, engine actor (Windows side of the core)
+crates/web        wasm-bindgen wrapper of the core for the web app
 app               eframe/egui window, tray thread (own message loop), settings, Windows glue
 tools/hsctl       bring-up CLI: scan / info / get / set / monitor / eq / engine / raw
 re/               reverse-engineering artefacts: device model JSON and helper scripts (decompiled app code stays local)
 assets/           app.ico (generated) and the logo SVG it is drawn from
+web/              Next.js web app (Web Serial); see web/README.md
 ```
+
+Protocol and behaviour changes go into `crates/protocol` / `crates/headset` once and reach both apps. After changing
+them, run `pnpm core` in `web/` to rebuild the committed WebAssembly in `web/lib/core/`.
 
 ## Command-line flags
 
