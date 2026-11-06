@@ -334,7 +334,11 @@ pub fn build(state: &AppState, settings: &Settings, autostart: bool) -> Menu {
     }
     let _ = menu.append(&item("open", "Open Sennheiser Control", true));
     let _ = menu.append(&item("settings", "Settings…", true));
-    let _ = menu.append(&check("autostart", crate::platform::autostart_label(), autostart));
+    let _ = menu.append(&check(
+        "autostart",
+        crate::platform::autostart_label(),
+        autostart,
+    ));
     let _ = menu.append(&check(
         "startmin",
         "Start minimized",
