@@ -188,6 +188,16 @@ pub fn work_area() -> Option<(i32, i32, i32, i32)> {
 /// DWM rounded corners are Windows-only.
 pub fn round_corners(_hwnd: usize) {}
 
+/// User-visible OS name for labels.
+pub fn os_name() -> &'static str {
+    "Linux"
+}
+
+/// Autostart toggle label.
+pub fn autostart_label() -> &'static str {
+    "Start at login"
+}
+
 #[cfg(test)]
 mod tests {
     /// Touches the real ~/.config/autostart entry (restores the previous state). Run explicitly: `cargo test -p app -- --ignored`.

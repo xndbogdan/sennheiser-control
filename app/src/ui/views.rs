@@ -41,7 +41,7 @@ impl HeadsetApp {
             return;
         }
         let Some(active) = st.active_device().cloned() else {
-            self.empty_state(ui, "No supported headset paired", "Pair your Sennheiser headset in Windows Bluetooth settings. It will show up here automatically.");
+            self.empty_state(ui, "No supported headset paired", &format!("Pair your Sennheiser headset in {} Bluetooth settings. It will show up here automatically.", crate::platform::os_name()));
             return;
         };
         if !active.connected {
@@ -68,7 +68,7 @@ impl HeadsetApp {
                 let reason = reason.clone();
                 card(ui, &p, |ui| {
                     section_title(ui, &p, ph::PLUG, "Can't reach the headset");
-                    ui.label(RichText::new("Windows is connected to the headset, but its control channel didn't answer. Retrying automatically.").font(regular(13.0)).color(p.text_dim));
+                    ui.label(RichText::new(format!("{} is connected to the headset, but its control channel didn't answer. Retrying automatically.", crate::platform::os_name())).font(regular(13.0)).color(p.text_dim));
                     ui.label(
                         RichText::new(reason)
                             .font(regular(12.0))
@@ -1124,7 +1124,7 @@ impl HeadsetApp {
                     &p,
                     ph::WARNING,
                     "Factory reset the headset?",
-                    "All headset settings return to their defaults and every paired device is removed, including this PC. Afterwards, pair the headset again in Windows Bluetooth settings.",
+                    &format!("All headset settings return to their defaults and every paired device is removed, including this PC. Afterwards, pair the headset again in {} Bluetooth settings.", crate::platform::os_name()),
                     |ui| {
                         if danger_button(ui, &p, "Reset headset").clicked() {
                             self.confirm_reset = false;
@@ -1154,7 +1154,7 @@ impl HeadsetApp {
                 ui,
                 &p,
                 ph::ROCKET_LAUNCH,
-                "Start with Windows",
+                crate::platform::autostart_label(),
                 Some("Starts quietly in the tray"),
                 true,
                 |ui| {
