@@ -60,7 +60,8 @@ MOMENTUM 3, PXC 550, HD 450BT or the first two MOMENTUM True Wireless, which use
 
 - Low-battery alerts are regular Windows notifications, so they only show up if notifications are on.
 - Tested on M4 firmware 3.38.3.
-- Crashes and errors go to `%APPDATA%\SennheiserControl\sennheiser-control-error.log`.
+- Crashes and errors go to `%APPDATA%\SennheiserControl\sennheiser-control-error.log`. Anonymous crash and
+  error reports are also sent to Sentry by default (Settings → Privacy to opt out, no personal data).
 - Not there yet: renaming the headphones, the multipoint on/off switch, prompt volume.
 
 ## Nerd stuff

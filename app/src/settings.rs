@@ -31,10 +31,17 @@ pub struct Settings {
     pub start_minimized: bool,
     /// Show a notification when the battery drops to this level (0 = off).
     pub low_battery_threshold: u8,
+    /// Send panics and error logs to Sentry. Enabled by default, opt-out in Settings → Privacy.
+    #[serde(default = "default_crash_reporting")]
+    pub crash_reporting: bool,
     pub theme: ThemePref,
     pub custom_presets: Vec<CustomPreset>,
     /// The "Custom" EQ curve: the last curve that matched no preset.
     pub custom_eq: Option<[f32; protocol::eq::BANDS]>,
+}
+
+fn default_crash_reporting() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -44,6 +51,7 @@ impl Default for Settings {
             close_to_tray: true,
             start_minimized: false,
             low_battery_threshold: 15,
+            crash_reporting: true,
             theme: ThemePref::System,
             custom_presets: Vec::new(),
             custom_eq: None,

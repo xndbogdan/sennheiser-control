@@ -5,6 +5,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod crash_report;
 mod platform;
 mod settings;
 mod shared;
@@ -63,6 +64,16 @@ impl log::Log for FileLogger {
                 if let Some(f) = errors.as_mut() {
                     let _ = writeln!(f, "{line}");
                 }
+            }
+            // Sentry: errors become events, warnings become breadcrumbs.
+            // Panics are captured by Sentry's panic integration; the panic
+            // hook's own log line is skipped inside `capture_error_log`.
+            match r.level() {
+                log::Level::Error => crate::crash_report::capture_error_log(&line),
+                log::Level::Warn => {
+                    crate::crash_report::breadcrumb(&line, sentry::Level::Warning);
+                }
+                _ => {}
             }
         }
     }
@@ -139,10 +150,16 @@ fn main() -> eframe::Result {
     if !simulate {
         platform::migrate_legacy_install();
     }
-    init_logging(has("--debug"));
-
     // the simulator keeps its own instance and settings file, separate from the real app
     settings::set_simulated(simulate);
+    // Load settings early: the crash-reporting opt-out must be known before Sentry starts.
+    let settings = settings::Settings::load();
+    // Init Sentry before `init_logging` so the panic hook below chains onto
+    // Sentry's panic handler. Keep the guard alive for the process lifetime.
+    let _sentry_guard =
+        crash_report::init(settings.crash_reporting, has("--debug"), simulate);
+    init_logging(has("--debug"));
+
     let (show_event, quit_event) = match platform::claim_single_instance(has("--quit"), simulate) {
         platform::Instance::Secondary => return Ok(()),
         platform::Instance::Primary {
@@ -150,7 +167,6 @@ fn main() -> eframe::Result {
             quit_event,
         } => (show_event, quit_event),
     };
-    let settings = settings::Settings::load();
     let minimized = has("--minimized") || settings.start_minimized;
     log::info!(
         "starting {APP_NAME} {} (minimized={minimized}, sim={simulate})",

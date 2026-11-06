@@ -52,6 +52,21 @@ them, run `pnpm core` in `web/` to rebuild the committed WebAssembly in `web/lib
   collapsible panel and confirmation
 - `HC_DEV_SCROLL=1500`: initial scroll offset of the main page
 - `HC_PRINT_MENU=1 cargo test -p app menu -- --nocapture`: print the whole tray menu tree
+- `SENTRY_DSN=https://…`: Sentry project DSN. Read at runtime if set, otherwise baked in at
+  compile time if set during `cargo build`. Unset = crash reporting runs disabled (local logs only).
+
+## Crash reporting (Sentry)
+
+The desktop app reports panics and `log::error!` lines to Sentry. Warnings become breadcrumbs.
+No tracing, no PII (`send_default_pii(false)`), opt-out in Settings → Privacy
+(`crash_reporting: true` by default in `%APPDATA%\SennheiserControl\settings.json`).
+
+- Code: `app/src/crash_report.rs` (`init` must run before `init_logging` so the panic hook
+  chains onto Sentry's handler; the guard is kept for the process lifetime).
+- Release builds set `[profile.release] debug = true` so Windows PDBs exist for symbolication.
+  Upload them with `sentry-cli debug-files upload --include-sources .` before/while shipping.
+- Verify: run with a real DSN and trigger a test error (e.g. `SENTRY_DSN=… cargo run -p app -- --sim`
+  plus a forced `panic!`), then check the issue title/message/URL in Sentry.
 
 ## Where things are stored
 

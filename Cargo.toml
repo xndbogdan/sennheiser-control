@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -30,6 +30,9 @@ lto = "thin"
 codegen-units = 1
 strip = true
 opt-level = 3
+# Sentry needs debug info to symbolicate crash stack traces (PDB on Windows,
+# alongside the exe). Upload with: `sentry-cli debug-files upload --include-sources .`
+debug = true
 
 # the web app's wasm build (`pnpm core` in web/): small, and not stripped so wasm-bindgen can read its features
 [profile.wasm]

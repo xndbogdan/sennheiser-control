@@ -1238,6 +1238,24 @@ impl HeadsetApp {
                 );
             }
         });
+        card(ui, &p, |ui| {
+            section_title(ui, &p, ph::SHIELD_CHECK, "Privacy");
+            let mut crash = s.crash_reporting;
+            setting_row(
+                ui,
+                &p,
+                ph::BUG,
+                "Crash reports",
+                Some("Send anonymous crash and error reports to help fix bugs. No personal data."),
+                true,
+                |ui| {
+                    if toggle(ui, &p, &mut crash, true).changed() {
+                        self.shared.update_settings(|s| s.crash_reporting = crash);
+                        crate::crash_report::set_enabled(crash);
+                    }
+                },
+            );
+        });
         ui.vertical_centered(|ui| {
             ui.label(RichText::new(format!("{} {}", crate::APP_NAME, env!("CARGO_PKG_VERSION"))).font(semibold(12.0)).color(p.text_dim));
             ui.add(
