@@ -158,6 +158,17 @@ fn main() -> eframe::Result {
     // Sentry's panic handler. Keep the guard alive for the process lifetime.
     let _sentry_guard = crash_report::init(settings.crash_reporting, has("--debug"), simulate);
     init_logging(has("--debug"));
+    // ponytail: winit can't hide windows on Wayland (set_visible is a no-op),
+    // which breaks hide-to-tray. Prefer XWayland when present (DISPLAY set);
+    // full hide/show verified there. HC_WAYLAND=1 forces native Wayland.
+    #[cfg(unix)]
+    if std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var_os("DISPLAY").is_some()
+        && std::env::var_os("HC_WAYLAND").is_none()
+    {
+        unsafe { std::env::remove_var("WAYLAND_DISPLAY") };
+        log::info!("using XWayland backend (hide-to-tray needs it; HC_WAYLAND=1 overrides)");
+    }
 
     #[allow(unused_variables)] // show/quit events are Windows-only; Linux gets 0s.
     let (show_event, quit_event) = match platform::claim_single_instance(has("--quit"), simulate) {
