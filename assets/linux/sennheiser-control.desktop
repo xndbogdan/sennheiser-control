@@ -4,5 +4,5 @@ Name=Sennheiser Control
 Comment=Unofficial tray companion for Sennheiser MOMENTUM headphones
 Exec=sennheiser-control
 Icon=sennheiser-control
-Categories=Utility;Audio;
+Categories=AudioVideo;Audio;
 StartupWMClass=sennheiser-control
