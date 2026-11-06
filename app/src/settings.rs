@@ -60,8 +60,15 @@ impl Default for Settings {
 }
 
 pub fn dir() -> PathBuf {
+    #[cfg(windows)]
     let base = std::env::var_os("APPDATA")
         .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    // ponytail: XDG first, ~/.config fallback; no new dep for one path.
+    #[cfg(not(windows))]
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
         .unwrap_or_else(std::env::temp_dir);
     base.join(APP_DIR)
 }

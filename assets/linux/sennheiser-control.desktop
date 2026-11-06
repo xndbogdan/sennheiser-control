@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Sennheiser Control
+Comment=Unofficial tray companion for Sennheiser MOMENTUM headphones
+Exec=sennheiser-control
+Icon=sennheiser-control
+Categories=Utility;Audio;
+StartupWMClass=sennheiser-control

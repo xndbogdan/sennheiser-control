@@ -1,24 +1,37 @@
 //! RFCOMM byte link to a paired device's custom SPP service (WinRT `StreamSocket`).
 
-use std::sync::{Arc, Mutex};
+#[cfg(windows)]
+use std::sync::Arc;
+#[cfg(windows)]
+use std::sync::Mutex;
+#[cfg(windows)]
 use std::thread;
+#[cfg(windows)]
 use std::time::Duration;
 
+#[cfg(windows)]
 use crossbeam_channel::{Receiver, Sender, unbounded};
+#[cfg(windows)]
 use windows::Devices::Bluetooth::Rfcomm::RfcommServiceId;
+#[cfg(windows)]
 use windows::Devices::Bluetooth::{BluetoothCacheMode, BluetoothDevice};
+#[cfg(windows)]
 use windows::Networking::Sockets::{SocketProtectionLevel, StreamSocket};
+#[cfg(windows)]
 use windows::Storage::Streams::{DataReader, DataWriter, InputStreamOptions};
+#[cfg(windows)]
 use windows::core::{GUID, HSTRING};
-
 #[derive(Debug, thiserror::Error)]
 pub enum LinkError {
+    #[cfg(windows)]
     #[error("Windows error: {0}")]
     Windows(#[from] windows::core::Error),
     #[error("the headset does not expose the control service (is it connected?)")]
     ServiceNotFound,
     #[error("connection timed out")]
     Timeout,
+    #[error("Bluetooth transport is Windows-only for now (BlueZ backend TODO)")]
+    Unsupported,
     #[error("link closed")]
     Closed,
 }
@@ -30,12 +43,16 @@ pub enum LinkEvent {
 }
 
 pub struct RfcommLink {
+    #[cfg(windows)]
     socket: StreamSocket,
+    #[cfg(windows)]
     writer: Mutex<DataWriter>,
 }
 
+#[cfg(windows)]
 const READ_CHUNK: u32 = 1024;
 
+#[cfg(windows)]
 impl RfcommLink {
     /// Resolve `service` on the device via SDP and connect. Blocks; call from a worker thread.
     pub fn connect(
@@ -104,6 +121,7 @@ impl RfcommLink {
     }
 }
 
+#[cfg(windows)]
 fn read_loop(reader: DataReader, tx: Sender<LinkEvent>) {
     loop {
         let n = match reader.LoadAsync(READ_CHUNK).and_then(|op| op.join()) {
@@ -130,17 +148,27 @@ fn read_loop(reader: DataReader, tx: Sender<LinkEvent>) {
 
 impl RfcommLink {
     pub fn send(&self, bytes: &[u8]) -> Result<(), LinkError> {
-        let w = self.writer.lock().map_err(|_| LinkError::Closed)?;
-        w.WriteBytes(bytes)?;
-        w.StoreAsync()?.join()?;
-        Ok(())
+        #[cfg(windows)]
+        {
+            let w = self.writer.lock().map_err(|_| LinkError::Closed)?;
+            w.WriteBytes(bytes)?;
+            w.StoreAsync()?.join()?;
+            Ok(())
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = bytes;
+            Err(LinkError::Unsupported)
+        }
     }
 
     pub fn close(&self) {
+        #[cfg(windows)]
         let _ = self.socket.Close();
     }
 }
 
+#[cfg(windows)]
 impl Drop for RfcommLink {
     fn drop(&mut self) {
         let _ = self.socket.Close();

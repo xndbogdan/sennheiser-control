@@ -156,10 +156,10 @@ fn main() -> eframe::Result {
     let settings = settings::Settings::load();
     // Init Sentry before `init_logging` so the panic hook below chains onto
     // Sentry's panic handler. Keep the guard alive for the process lifetime.
-    let _sentry_guard =
-        crash_report::init(settings.crash_reporting, has("--debug"), simulate);
+    let _sentry_guard = crash_report::init(settings.crash_reporting, has("--debug"), simulate);
     init_logging(has("--debug"));
 
+    #[allow(unused_variables)] // show/quit events are Windows-only; Linux gets 0s.
     let (show_event, quit_event) = match platform::claim_single_instance(has("--quit"), simulate) {
         platform::Instance::Secondary => return Ok(()),
         platform::Instance::Primary {
@@ -206,6 +206,7 @@ fn main() -> eframe::Result {
                 platform::round_corners(w.hwnd.get() as usize);
             }
             let tray_wake = platform::WakeEvent::new();
+            let tray_wake_notify = tray_wake.clone();
             let ctx = cc.egui_ctx.clone();
             let engine = Engine::start(
                 EngineOptions {
@@ -213,7 +214,7 @@ fn main() -> eframe::Result {
                     preferred_device: settings.preferred_device.clone(),
                 },
                 move || {
-                    tray_wake.signal();
+                    tray_wake_notify.signal();
                     ctx.request_repaint();
                 },
             );
@@ -226,6 +227,7 @@ fn main() -> eframe::Result {
                 tray_wake,
             ));
             let tray_thread = tray::spawn(shared.clone());
+            #[cfg(windows)]
             if show_event != 0 && quit_event != 0 {
                 let shared = shared.clone();
                 std::thread::Builder::new()

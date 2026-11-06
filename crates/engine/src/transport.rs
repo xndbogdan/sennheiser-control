@@ -26,7 +26,16 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub fn connect_rfcomm(
     device_id: &str,
 ) -> Result<(Arc<dyn Transport>, Receiver<LinkEvent>), String> {
-    let (link, rx) = RfcommLink::connect(device_id, protocol::GAIA3_SPP_UUID, CONNECT_TIMEOUT)
-        .map_err(|e| e.to_string())?;
-    Ok((link as Arc<dyn Transport>, rx))
+    #[cfg(windows)]
+    {
+        let (link, rx) = RfcommLink::connect(device_id, protocol::GAIA3_SPP_UUID, CONNECT_TIMEOUT)
+            .map_err(|e| e.to_string())?;
+        Ok((link as Arc<dyn Transport>, rx))
+    }
+    // ponytail: BlueZ backend TODO; simulator (`--sim`) needs no transport.
+    #[cfg(not(windows))]
+    {
+        let _ = device_id;
+        Err("Bluetooth transport is Windows-only for now (BlueZ backend TODO)".into())
+    }
 }
