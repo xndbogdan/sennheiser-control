@@ -1124,7 +1124,10 @@ impl HeadsetApp {
                     &p,
                     ph::WARNING,
                     "Factory reset the headset?",
-                    &format!("All headset settings return to their defaults and every paired device is removed, including this PC. Afterwards, pair the headset again in {} Bluetooth settings.", crate::platform::os_name()),
+                    &format!(
+                        "All headset settings return to their defaults and every paired device is removed, including this PC. Afterwards, pair the headset again in {} Bluetooth settings.",
+                        crate::platform::os_name()
+                    ),
                     |ui| {
                         if danger_button(ui, &p, "Reset headset").clicked() {
                             self.confirm_reset = false;

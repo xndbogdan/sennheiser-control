@@ -56,6 +56,16 @@ MOMENTUM 3, PXC 550, HD 450BT or the first two MOMENTUM True Wireless, which use
 
    ![The tray menu](screenshots/tray-menu.png)
 
+### Linux
+
+There's no release binary yet — build it yourself (needs Rust stable and `dbus-devel` /
+`libdbus-1-dev`, nothing else): `cargo build --release -p app`, then copy
+`target/release/sennheiser-control` to `~/.local/bin`, `assets/linux/*.png` to
+`~/.local/share/icons/hicolor/` and `assets/linux/sennheiser-control.desktop` to
+`~/.local/share/applications/`. Pair and connect the headphones in your desktop's Bluetooth
+settings first. Details and quirks are in [`DEVELOPMENT.md`](DEVELOPMENT.md#linux-build).
+Tested on Fedora/KDE with M4 firmware 3.37.3.
+
 ## Good to know
 
 - Low-battery alerts are regular Windows notifications, so they only show up if notifications are on.
