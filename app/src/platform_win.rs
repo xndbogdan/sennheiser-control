@@ -231,3 +231,13 @@ mod tests {
         super::set_autostart(before).unwrap();
     }
 }
+
+/// User-visible OS name for labels.
+pub fn os_name() -> &'static str {
+    "Windows"
+}
+
+/// Autostart toggle label.
+pub fn autostart_label() -> &'static str {
+    "Start with Windows"
+}
