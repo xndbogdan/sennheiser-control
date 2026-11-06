@@ -353,6 +353,7 @@ impl Actor {
                 .map(|d| d.product)
                 .unwrap_or_default();
             self.generation += 1;
+            log::info!("connecting (generation {})", self.generation);
             self.state.link = LinkState::Connecting;
             self.state.headset = None;
             self.session = Some(session::spawn(
@@ -392,6 +393,7 @@ impl Actor {
                 return;
             }
             Action::Reconnect => {
+                log::info!("reconnect requested");
                 self.stop_session();
                 self.attempts = 0;
                 self.next_attempt = Instant::now();

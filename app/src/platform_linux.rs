@@ -162,7 +162,19 @@ impl WakeEvent {
 // ----------------------------------------------------------------------------------------------- shell & window
 
 pub fn open_bluetooth_settings() {
-    // ponytail: best-effort; GNOME understands settings://, elsewhere it just fails silently.
+    // ponytail: settings:// URIs only work on GNOME; try each desktop's panel in turn.
+    const CANDIDATES: &[(&str, &[&str])] = &[
+        ("kcmshell6", &["kcm_bluetooth"]),        // KDE
+        ("gnome-control-center", &["bluetooth"]), // GNOME
+        ("blueman-manager", &[]),                 // Blueman (MATE/Xfce/…)
+        ("blueberry", &[]),                       // Cinnamon
+    ];
+    for (bin, args) in CANDIDATES {
+        match std::process::Command::new(bin).args(*args).spawn() {
+            Ok(_) => return,
+            Err(e) => log::debug!("{bin} not available: {e}"),
+        }
+    }
     let _ = std::process::Command::new("xdg-open")
         .arg("settings://bluetooth")
         .spawn();
