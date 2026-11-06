@@ -1,4 +1,6 @@
-//! Tray thread: owns the notification-area icon and its menu, runs its own Win32 message loop.
+//! Tray thread: owns the notification-area icon and its menu.
+//! Windows runs its own Win32 message loop; Linux blocks on the shared wake channel
+//! (the tray-icon KSNI backend pumps D-Bus on its own worker thread).
 
 pub mod icon;
 pub mod menu;
@@ -10,10 +12,13 @@ use std::thread::JoinHandle;
 use engine::{AppState, LinkState};
 use tray_icon::menu::MenuEvent;
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+#[cfg(windows)]
 use windows::Win32::UI::HiDpi::{GetDpiForSystem, GetSystemMetricsForDpi};
+#[cfg(windows)]
 use windows::Win32::UI::Shell::{
     NIF_INFO, NIIF_USER, NIIF_WARNING, NIM_MODIFY, NOTIFYICONDATAW, Shell_NotifyIconW,
 };
+#[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
     DispatchMessageW, MSG, MsgWaitForMultipleObjects, PM_REMOVE, PeekMessageW, QS_ALLINPUT,
     SM_CXSMICON, TranslateMessage, WM_QUIT,
@@ -43,8 +48,15 @@ fn visual(state: &AppState) -> TrayVisual {
     }
 }
 
+#[cfg(windows)]
 fn tray_icon_size() -> u32 {
     unsafe { GetSystemMetricsForDpi(SM_CXSMICON, GetDpiForSystem()).max(16) as u32 }
+}
+
+/// SNI pixmaps take any size; 32 keeps the battery number legible.
+#[cfg(not(windows))]
+fn tray_icon_size() -> u32 {
+    32
 }
 
 struct Rendered {
@@ -88,7 +100,6 @@ fn run(shared: Arc<Shared>) {
             return;
         }
     };
-
     {
         let shared = shared.clone();
         TrayIconEvent::set_event_handler(Some(move |e: TrayIconEvent| {
@@ -106,7 +117,6 @@ fn run(shared: Arc<Shared>) {
         let shared = shared.clone();
         MenuEvent::set_event_handler(Some(move |e: MenuEvent| menu::handle(&e.id.0, &shared)));
     }
-
     let mut seen = (
         shared.engine.version(),
         shared.settings_version(),
@@ -114,6 +124,7 @@ fn run(shared: Arc<Shared>) {
     );
     let mut low = LowBattery { warned: false };
     loop {
+        #[cfg(windows)]
         unsafe {
             let handles = [shared.tray_wake.handle()];
             MsgWaitForMultipleObjects(Some(&handles), false, 2000, QS_ALLINPUT);
@@ -126,6 +137,10 @@ fn run(shared: Arc<Shared>) {
                 DispatchMessageW(&msg);
             }
         }
+        #[cfg(not(windows))]
+        shared
+            .tray_wake
+            .wait_timeout(std::time::Duration::from_millis(2000));
         if shared.quitting.load(Ordering::SeqCst) {
             break;
         }
@@ -183,6 +198,7 @@ fn check_low_battery(tray: &TrayIcon, state: &AppState, threshold: u8, low: &mut
 
 /// Show a Windows notification attached to our tray icon (shown as a toast on Windows 10/11).
 /// tray-icon does not expose the icon's `uID`; its window hosts only our icon, so probe the few small ids.
+#[cfg(windows)]
 pub fn notify(tray: &TrayIcon, title: &str, body: &str, warning: bool) {
     static UID: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
     let mut nid = NOTIFYICONDATAW {
@@ -211,9 +227,26 @@ pub fn notify(tray: &TrayIcon, title: &str, body: &str, warning: bool) {
     log::warn!("notification '{title}' could not be shown");
 }
 
+#[cfg(windows)]
 fn copy_wide(dst: &mut [u16], s: &str) {
     let n = dst.len() - 1;
     for (d, c) in dst.iter_mut().zip(s.encode_utf16().take(n)) {
         *d = c;
+    }
+}
+
+/// Desktop notification via D-Bus (no tray icon attachment on Linux).
+#[cfg(not(windows))]
+pub fn notify(_tray: &TrayIcon, title: &str, body: &str, warning: bool) {
+    let mut n = notify_rust::Notification::new();
+    n.summary(title)
+        .body(body)
+        .appname(crate::APP_NAME)
+        .icon("battery-low");
+    if warning {
+        n.urgency(notify_rust::Urgency::Critical);
+    }
+    if let Err(e) = n.show() {
+        log::warn!("notification '{title}' could not be shown: {e}");
     }
 }

@@ -190,7 +190,7 @@ impl Actor {
             Ok((w, rx)) => (Some(w), rx),
             Err(e) => {
                 log::error!("device watcher failed: {e}");
-                self.state.last_error = Some(format!("Bluetooth unavailable: {}", e.message()));
+                self.state.last_error = Some(format!("Bluetooth unavailable: {e}"));
                 self.state.discovery_done = true;
                 (None, crossbeam_channel::never())
             }

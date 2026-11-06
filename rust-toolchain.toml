@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.95-x86_64-pc-windows-msvc"
+channel = "stable"
 components = ["rustfmt", "clippy"]
 # the web app's shared core (`pnpm core` in web/)
 targets = ["wasm32-unknown-unknown"]

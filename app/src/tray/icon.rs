@@ -33,17 +33,87 @@ pub struct IconRenderer {
 }
 
 fn load_font() -> Option<FontVec> {
-    let dir = std::env::var_os("WINDIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| "C:\\Windows".into());
-    for name in ["segoeuib.ttf", "seguisb.ttf", "segoeui.ttf"] {
-        if let Ok(bytes) = std::fs::read(dir.join("Fonts").join(name))
-            && let Ok(f) = FontVec::try_from_vec(bytes)
-        {
-            return Some(f);
+    system_font_bytes(true).and_then(|b| FontVec::try_from_vec(b).ok())
+}
+
+/// System UI font bytes. Windows: Segoe UI; Linux: first match walking the
+/// font dirs (DejaVu/Liberation/Noto, bold preferred when asked).
+pub(crate) fn system_font_bytes(prefer_bold: bool) -> Option<Vec<u8>> {
+    #[cfg(windows)]
+    {
+        let dir = std::env::var_os("WINDIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| "C:\\Windows".into());
+        let files = if prefer_bold {
+            ["segoeuib.ttf", "seguisb.ttf", "segoeui.ttf"]
+        } else {
+            ["segoeui.ttf", "seguisb.ttf", "segoeuib.ttf"]
+        };
+        for name in files {
+            if let Ok(bytes) = std::fs::read(dir.join("Fonts").join(name)) {
+                return Some(bytes);
+            }
+        }
+        None
+    }
+    #[cfg(not(windows))]
+    {
+        // ponytail: walk well-known dirs instead of depending on fontconfig.
+        let names: &[&str] = if prefer_bold {
+            &[
+                "DejaVuSans-Bold.ttf",
+                "LiberationSans-Bold.ttf",
+                "NotoSans-Bold.ttf",
+                "DejaVuSans.ttf",
+                "LiberationSans-Regular.ttf",
+                "NotoSans-Regular.ttf",
+            ]
+        } else {
+            &[
+                "DejaVuSans.ttf",
+                "LiberationSans-Regular.ttf",
+                "NotoSans-Regular.ttf",
+                "DejaVuSans-Bold.ttf",
+                "LiberationSans-Bold.ttf",
+                "NotoSans-Bold.ttf",
+            ]
+        };
+        let mut dirs = vec![std::path::PathBuf::from("/usr/share/fonts")];
+        if let Some(h) = std::env::var_os("HOME") {
+            dirs.push(std::path::PathBuf::from(&h).join(".local/share/fonts"));
+            dirs.push(std::path::PathBuf::from(&h).join(".fonts"));
+        }
+        let mut found: Vec<(String, std::path::PathBuf)> = Vec::new();
+        for d in &dirs {
+            visit_fonts(d, 4, &mut found);
+        }
+        names.iter().find_map(|n| {
+            found
+                .iter()
+                .find(|(f, _)| f == n)
+                .and_then(|(_, p)| std::fs::read(p).ok())
+        })
+    }
+}
+
+#[cfg(not(windows))]
+fn visit_fonts(dir: &std::path::Path, depth: u8, out: &mut Vec<(String, std::path::PathBuf)>) {
+    if depth == 0 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.is_dir() {
+            visit_fonts(&p, depth - 1, out);
+        } else if p.extension().is_some_and(|x| x == "ttf" || x == "otf") {
+            if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                out.push((name.to_owned(), p));
+            }
         }
     }
-    None
 }
 
 fn rgba(c: [u8; 3], a: f32) -> Color {

@@ -102,10 +102,8 @@ pub fn icon(size: f32) -> FontId {
 }
 
 fn system_font(file: &str) -> Option<Vec<u8>> {
-    let dir = std::env::var_os("WINDIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| "C:\\Windows".into());
-    std::fs::read(dir.join("Fonts").join(file)).ok()
+    // ponytail: the filename only picks bold-vs-regular now; bytes come from the shared loader.
+    crate::tray::icon::system_font_bytes(file != "segoeui.ttf")
 }
 
 /// Segoe UI from the system (not bundled), phosphor icons as fallback glyphs.
