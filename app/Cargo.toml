@@ -13,7 +13,7 @@ path = "src/main.rs"
 protocol.workspace = true
 engine.workspace = true
 sentry = "0.49.5"
-eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "accesskit"] }
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "accesskit"] }
 egui = "0.36"
 egui-phosphor = "0.14"
 raw-window-handle = "0.6"
@@ -27,6 +27,9 @@ parking_lot = "0.12"
 [target.'cfg(windows)'.dependencies]
 tray-icon = "0.26"
 winreg = "0.56"
+# ponytail: glow on Windows (proven there), wgpu on Linux (glow finds no
+# GL config on NVIDIA Wayland; wgpu goes through Vulkan instead).
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "accesskit", "glow"] }
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Security",
@@ -40,6 +43,7 @@ windows = { version = "0.62", features = [
 
 [target.'cfg(unix)'.dependencies]
 # ponytail: ksni backend = pure Rust D-Bus tray, no GTK/AppIndicator system deps.
+eframe = { version = "0.36", default-features = false, features = ["default_fonts", "accesskit", "wgpu"] }
 tray-icon = { version = "0.26", default-features = false, features = ["ksni"] }
 notify-rust = "4"
 

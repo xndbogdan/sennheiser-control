@@ -488,7 +488,20 @@ impl eframe::App for HeadsetApp {
         self.palette.bg.to_normalized_gamma_f32()
     }
 
+    #[cfg(windows)]
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.shared.tray_wake.signal();
+        self.shared.engine.shutdown();
+        if let Some(t) = self.tray_thread.take() {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !t.is_finished() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+    }
+    // same shutdown without a glow context (Linux builds eframe with wgpu)
+    #[cfg(not(windows))]
+    fn on_exit(&mut self) {
         self.shared.quitting.store(true, Ordering::SeqCst);
         self.shared.tray_wake.signal();
         self.shared.engine.shutdown();
