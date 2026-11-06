@@ -108,10 +108,10 @@ fn visit_fonts(dir: &std::path::Path, depth: u8, out: &mut Vec<(String, std::pat
         let p = e.path();
         if p.is_dir() {
             visit_fonts(&p, depth - 1, out);
-        } else if p.extension().is_some_and(|x| x == "ttf" || x == "otf") {
-            if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
-                out.push((name.to_owned(), p));
-            }
+        } else if p.extension().is_some_and(|x| x == "ttf" || x == "otf")
+            && let Some(name) = p.file_name().and_then(|n| n.to_str())
+        {
+            out.push((name.to_owned(), p));
         }
     }
 }

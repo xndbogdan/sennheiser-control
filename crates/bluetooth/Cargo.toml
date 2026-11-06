@@ -22,4 +22,8 @@ windows = { version = "0.62", features = [
     "Networking_Sockets",
     "Storage_Streams",
 ] }
-# ponytail: Linux BlueZ backend (bluer) lands in the next step; stubs until then.
+# ponytail: BlueZ backend (bluer) lands in the next step; stubs until then.
+[target.'cfg(unix)'.dependencies]
+bluer = { version = "0.17", default-features = false, features = ["bluetoothd", "rfcomm", "l2cap"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+libc = "0.2"

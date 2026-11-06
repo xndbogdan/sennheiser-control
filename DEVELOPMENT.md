@@ -111,15 +111,26 @@ Bump the version in `Cargo.toml` (workspace) and `app/app.rc` first.
 
 ## Linux build
 
-No system `-devel` packages needed: the tray uses tray-icon's `ksni` backend (pure Rust D-Bus,
-no GTK/AppIndicator headers) and eframe/winit dlopen GL/X11/Wayland at runtime.
+Prereq: a C `libdbus` for linking (`sudo dnf install dbus-devel` / `sudo apt install libdbus-1-dev`;
+no other `-devel` packages needed — the tray uses tray-icon's `ksni` backend, pure Rust D-Bus,
+and eframe/winit dlopen GL/X11/Wayland at runtime).
 
 ```
-cargo build --release -p app   # target/release/sennheiser-control (~18 MB, single file)
+cargo build --release -p app   # target/release/sennheiser-control (~20 MB, single file)
+cargo run -p app               # pair + connect the headset in system Bluetooth settings first
 cargo run -p app -- --sim      # simulated headset, no hardware needed
+cargo run -p hsctl -- scan     # list paired headsets (BlueZ check)
 cargo test --workspace
 cargo check --target x86_64-pc-windows-msvc --workspace   # Windows still intact
 ```
+
+Bluetooth is BlueZ via `bluer`: discovery polls paired devices (2 s diff loop, same
+`DiscoveryEvent` shape as WinRT), RFCOMM resolves the GAIA channel with a hand-rolled SDP
+query over L2CAP and connects directly. The headset exposes the GAIA UUID on two channels —
+only one runs GAIA (it answers, the other drops instantly), so connect probes candidates in
+order and keeps the first link that survives 700 ms. Quirks found: bluer L2CAP needs
+`SeqPacket::connect` (binds first; raw `Socket::connect` yields ENOTCONN on send), and the
+fresh channel needs ~500 ms before the first send lands.
 
 Install (per user): copy the binary to `~/.local/bin`, `assets/linux/*.png` to
 `~/.local/share/icons/hicolor/{16,24,32,48,64,128,256}x{...}/apps/` (renamed to
@@ -131,6 +142,4 @@ Settings and logs live in `~/.config/SennheiserControl/` (`settings.json`, `app.
 
 Known gaps: GNOME needs an AppIndicator/SNI shell extension for the tray icon (KDE works out
 of the box). Second-launch window showing and `--quit` are not wired up on Linux yet (the
-lockfile only blocks a second instance; quit via the tray menu). Real Bluetooth hardware still
-needs the BlueZ backend: `crates/bluetooth` discovery + RFCOMM are stubs that return an error
-until then (`--sim` works everywhere).
+lockfile only blocks a second instance; quit via the tray menu).
