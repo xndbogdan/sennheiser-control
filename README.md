@@ -4,7 +4,7 @@ A small Windows tray app I slopped into existence in my free time to get a sembl
 **Sennheiser MOMENTUM 4** headphones under Windows, because Sennheiser didn't think anyone would use these with a
 computer or something.
 
-It talks to the headphones directly over Bluetooth. No phone, no account, no cloud.
+You only need to connect the headphones to your computer and start this up.
 
 ![The main window](screenshots/main-window.jpeg)
 
