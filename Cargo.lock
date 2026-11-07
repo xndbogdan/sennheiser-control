@@ -407,7 +407,7 @@ dependencies = [
 
 [[package]]
 name = "app"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "ab_glyph",
  "crossbeam-channel",
@@ -805,7 +805,7 @@ dependencies = [
 
 [[package]]
 name = "bluetooth"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bluer",
  "crossbeam-channel",
@@ -1595,7 +1595,7 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 
 [[package]]
 name = "engine"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bluetooth",
  "crossbeam-channel",
@@ -2372,7 +2372,7 @@ dependencies = [
 
 [[package]]
 name = "headset"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "protocol",
 ]
@@ -2414,7 +2414,7 @@ dependencies = [
 
 [[package]]
 name = "hsctl"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "bluetooth",
  "crossbeam-channel",
@@ -4152,7 +4152,7 @@ checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
 
 [[package]]
 name = "protocol"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4509,7 +4509,7 @@ checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
 name = "sennheiser-web"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "headset",
  "protocol",
