@@ -1,5 +1,7 @@
 fn main() {
-    // ponytail: Windows-only icon/version embedding; Linux uses a .desktop file + PNG instead.
+    // Windows-only icon/version embedding; Linux uses a .desktop file + PNG instead.
+    // Note: `cfg` here tests the *host*, so cross-compiling to Windows from Linux
+    // skips embedding (native builds on each OS — the documented flow — are exact).
     #[cfg(windows)]
     {
         println!("cargo:rerun-if-changed=app.rc");

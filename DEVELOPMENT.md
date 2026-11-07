@@ -111,8 +111,9 @@ Bump the version in `Cargo.toml` (workspace) and `app/app.rc` first.
 
 ## Linux build
 
-Prereq: a C `libdbus` for linking (`sudo dnf install dbus-devel` / `sudo apt install libdbus-1-dev`;
-no other `-devel` packages needed — the tray uses tray-icon's `ksni` backend, pure Rust D-Bus.
+Prereq: a C `libdbus` for linking (`sudo dnf install dbus-devel openssl-devel` /
+`sudo apt install libdbus-1-dev libssl-dev`). The tray uses tray-icon's `ksni`
+backend, pure Rust D-Bus, so no GTK/AppIndicator `-devel` packages are needed.
 The window builds eframe with `wgpu` (Vulkan) instead of `glow`: glow finds no GL config on
 NVIDIA Wayland; eframe/winit otherwise dlopen their Wayland/X11 libs at runtime.
 

@@ -158,10 +158,10 @@ fn main() -> eframe::Result {
     // Sentry's panic handler. Keep the guard alive for the process lifetime.
     let _sentry_guard = crash_report::init(settings.crash_reporting, has("--debug"), simulate);
     init_logging(has("--debug"));
-    // ponytail: winit can't hide windows on Wayland (set_visible is a no-op),
+    // winit can't hide windows on Wayland (set_visible is a no-op),
     // which breaks hide-to-tray. Prefer XWayland when present (DISPLAY set);
     // full hide/show verified there. HC_WAYLAND=1 forces native Wayland.
-    #[cfg(unix)]
+    #[cfg(target_os = "linux")]
     if std::env::var_os("WAYLAND_DISPLAY").is_some()
         && std::env::var_os("DISPLAY").is_some()
         && std::env::var_os("HC_WAYLAND").is_none()
@@ -196,7 +196,12 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(APP_NAME)
-            .with_app_id(APP_DIR)
+            // Wayland app_id must match the .desktop basename for window grouping.
+            .with_app_id(if cfg!(target_os = "linux") {
+                "sennheiser-control"
+            } else {
+                APP_DIR
+            })
             .with_inner_size([408.0, height])
             .with_min_inner_size([380.0, 480.0])
             .with_decorations(false)
@@ -217,6 +222,8 @@ fn main() -> eframe::Result {
                 platform::round_corners(w.hwnd.get() as usize);
             }
             let tray_wake = platform::WakeEvent::new();
+            // `clone` is a real clone on Linux; on Windows `WakeEvent` is `Copy`.
+            #[allow(clippy::clone_on_copy)]
             let tray_wake_notify = tray_wake.clone();
             let ctx = cc.egui_ctx.clone();
             let engine = Engine::start(

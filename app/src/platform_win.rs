@@ -211,6 +211,16 @@ pub fn round_corners(hwnd: usize) {
     }
 }
 
+/// User-visible OS name for labels.
+pub fn os_name() -> &'static str {
+    "Windows"
+}
+
+/// Autostart toggle label.
+pub fn autostart_label() -> &'static str {
+    "Start with Windows"
+}
+
 #[cfg(test)]
 mod tests {
     /// Touches the real HKCU Run key (restores the previous state). Run explicitly: `cargo test -p app -- --ignored`.
@@ -230,14 +240,4 @@ mod tests {
         assert!(!super::autostart_enabled());
         super::set_autostart(before).unwrap();
     }
-}
-
-/// User-visible OS name for labels.
-pub fn os_name() -> &'static str {
-    "Windows"
-}
-
-/// Autostart toggle label.
-pub fn autostart_label() -> &'static str {
-    "Start with Windows"
 }

@@ -58,8 +58,9 @@ MOMENTUM 3, PXC 550, HD 450BT or the first two MOMENTUM True Wireless, which use
 
 ### Linux
 
-There's no release binary yet — build it yourself (needs Rust stable and `dbus-devel` /
-`libdbus-1-dev`, nothing else): `cargo build --release -p app`, then copy
+There's no release binary yet — build it yourself (needs Rust 1.95+, `dbus-devel` /
+`libdbus-1-dev` for the BlueZ D-Bus link and `openssl-devel` / `libssl-dev`
+for crash-report uploads): `cargo build --release -p app`, then copy
 `target/release/sennheiser-control` to `~/.local/bin`, `assets/linux/*.png` to
 `~/.local/share/icons/hicolor/` and `assets/linux/sennheiser-control.desktop` to
 `~/.local/share/applications/`. Pair and connect the headphones in your desktop's Bluetooth

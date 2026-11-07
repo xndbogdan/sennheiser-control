@@ -490,6 +490,7 @@ impl eframe::App for HeadsetApp {
 
     #[cfg(windows)]
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.shared.quitting.store(true, Ordering::SeqCst);
         self.shared.tray_wake.signal();
         self.shared.engine.shutdown();
         if let Some(t) = self.tray_thread.take() {

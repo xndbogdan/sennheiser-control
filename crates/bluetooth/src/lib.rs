@@ -1,4 +1,4 @@
-//! Windows Bluetooth discovery and RFCOMM transport.
+//! Paired Bluetooth Classic discovery and RFCOMM transport (WinRT on Windows, BlueZ on Linux).
 
 pub mod discovery;
 pub mod rfcomm;

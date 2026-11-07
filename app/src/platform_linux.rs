@@ -114,9 +114,12 @@ fn lock_path(sim: bool) -> PathBuf {
     d
 }
 
-// ponytail: /proc liveness check instead of a file-lock dep; stale locks self-heal.
+// /proc liveness check instead of a file-lock dep; stale locks self-heal.
+// The cmdline must belong to us, so an unrelated process reusing the PID
+// doesn't block a fresh launch.
 fn pid_alive(pid: u32) -> bool {
-    std::fs::read_to_string(format!("/proc/{pid}/cmdline")).is_ok()
+    std::fs::read_to_string(format!("/proc/{pid}/cmdline"))
+        .is_ok_and(|c| c.contains("sennheiser-control"))
 }
 
 /// `_quit` is accepted but best-effort: a running instance is left alone (quit via the tray menu).

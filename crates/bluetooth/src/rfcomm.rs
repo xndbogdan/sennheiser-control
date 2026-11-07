@@ -146,8 +146,8 @@ impl RfcommLink {
         let per_try = (timeout - sdp_budget.min(timeout)) / channels.len().max(1) as u32;
         for ch in channels {
             match try_channel(addr, ch, per_try) {
-                Ok(link) if link_alive(&link.1) => return Ok(link),
-                Ok((link, _)) => link.close(),
+                Ok(link) if link_alive(&link.1, &link.2) => return Ok((link.0, link.1)),
+                Ok((link, _, _)) => link.close(),
                 Err(e) => log::info!("channel {ch} rejected: {e}"),
             }
             std::thread::sleep(Duration::from_millis(300));
@@ -163,7 +163,7 @@ fn try_channel(
     addr: bluer::Address,
     channel: u8,
     timeout: Duration,
-) -> Result<(Arc<RfcommLink>, Receiver<LinkEvent>), LinkError> {
+) -> Result<(Arc<RfcommLink>, Receiver<LinkEvent>, Sender<LinkEvent>), LinkError> {
     use std::os::unix::io::{AsRawFd, FromRawFd};
 
     let stream = super::discovery::rt().block_on(async {
@@ -193,6 +193,7 @@ fn try_channel(
         .try_clone()
         .map_err(|e| LinkError::BlueZ(e.to_string()))?;
     let (tx, rx) = unbounded();
+    let probe_tx = tx.clone();
     let link = Arc::new(RfcommLink {
         write: Mutex::new(writer),
     });
@@ -200,13 +201,14 @@ fn try_channel(
         .name("rfcomm-reader".into())
         .spawn(move || read_loop(reader, tx))
         .ok();
-    Ok((link, rx))
+    Ok((link, rx, probe_tx))
 }
 
-/// A just-connected link counts as live unless the headset already closed it
-/// (wrong service answers the connect, then drops the DLC instantly).
+// A just-connected link counts as ours unless the headset already closed it
+// (the GAIA UUID is exposed on two channels; the wrong one drops the DLC
+// instantly). Data also proves liveness — requeue it so the session keeps it.
 #[cfg(not(windows))]
-fn link_alive(rx: &Receiver<LinkEvent>) -> bool {
+fn link_alive(rx: &Receiver<LinkEvent>, tx: &Sender<LinkEvent>) -> bool {
     let deadline = std::time::Instant::now() + Duration::from_millis(700);
     loop {
         match rx.try_recv() {
@@ -215,6 +217,10 @@ fn link_alive(rx: &Receiver<LinkEvent>) -> bool {
                     return true;
                 }
                 std::thread::sleep(Duration::from_millis(50));
+            }
+            Ok(LinkEvent::Data(d)) => {
+                let _ = tx.send(LinkEvent::Data(d));
+                return true;
             }
             _ => return false,
         }
