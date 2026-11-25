@@ -306,7 +306,12 @@ impl SimModel {
                     return self.error(VENDOR_SENNHEISER, id, 5);
                 };
                 let pairs = &mut self.props.get_mut(&sn::ANC_MODE_GET).unwrap().value;
-                match pairs.chunks_exact_mut(2).find(|c| c[0] == mode) {
+                match pairs
+                    .as_chunks_mut::<2>()
+                    .0
+                    .iter_mut()
+                    .find(|c| c[0] == mode)
+                {
                     Some(c) => c[1] = state,
                     None => {
                         return self.error(VENDOR_SENNHEISER, id, 5);

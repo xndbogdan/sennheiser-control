@@ -346,10 +346,8 @@ fn run() -> Result<(), String> {
         "dump" => {
             // safe surface map: Qualcomm supported features + every Sennheiser feature's notification dump
             let s = open(device.as_deref(), false)?;
-            for (name, req) in [("qc api", Request::ApiVersion)] {
-                if let Ok(p) = s.client.request(&req) {
-                    println!("{name}: [{}]", protocol::hex(&p.payload));
-                }
+            if let Ok(p) = s.client.request(&Request::ApiVersion) {
+                println!("qc api: [{}]", protocol::hex(&p.payload));
             }
             let mut more = true;
             let mut first = true;

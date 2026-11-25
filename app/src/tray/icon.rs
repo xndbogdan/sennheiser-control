@@ -489,7 +489,7 @@ fn parse_svg_path(d: &str) -> Option<tiny_skia::Path> {
 
 fn to_straight(pm: Pixmap) -> Vec<u8> {
     let mut v = pm.take();
-    for px in v.chunks_exact_mut(4) {
+    for px in v.as_chunks_mut::<4>().0 {
         let a = px[3] as u32;
         if a > 0 && a < 255 {
             for c in &mut px[..3] {

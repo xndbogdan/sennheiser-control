@@ -125,7 +125,7 @@ fn battery(d: &[u8]) -> Vec<Update> {
 }
 
 fn anc_pairs(p: &[u8]) -> Vec<Update> {
-    let pairs: Vec<(u8, u8)> = p.chunks_exact(2).map(|c| (c[0], c[1])).collect();
+    let pairs: Vec<(u8, u8)> = p.as_chunks::<2>().0.iter().map(|&[a, b]| (a, b)).collect();
     let mut out = Vec::new();
     for &(mode, state) in &pairs {
         match mode {
@@ -256,8 +256,10 @@ pub fn decode(p: &Packet, request: Option<&Request>) -> Vec<Update> {
         },
         sn::EQ1_PARAM_GROUP_GET => {
             vec![Update::Eq1Params(
-                d.chunks_exact(2)
-                    .map(|c| i16::from_be_bytes([c[0], c[1]]))
+                d.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|&c| i16::from_be_bytes(c))
                     .collect(),
             )]
         }
