@@ -3,7 +3,7 @@
 #[cfg(windows)]
 use crossbeam_channel::{Receiver, Sender, unbounded};
 #[cfg(windows)]
-use windows::Devices::Bluetooth::BluetoothDevice;
+use windows::Devices::Bluetooth::{BluetoothAdapter, BluetoothConnectionStatus, BluetoothDevice};
 #[cfg(windows)]
 use windows::Devices::Enumeration::{
     DeviceInformation, DeviceInformationKind, DeviceInformationUpdate, DeviceWatcher,
@@ -77,17 +77,96 @@ fn additional_properties() -> IIterable<HSTRING> {
     ])
 }
 
+/// Paired or connected Classic devices. After an adapter swap Windows can report a connected headset as
+/// `IsPaired=false` (seen with a MOMENTUM 4 moved from a MediaTek RZ616 to an Intel radio), so paired alone misses it.
+/// `remembered` (a device id) is listed even then, so that headset still shows up while disconnected.
 #[cfg(windows)]
-/// One-shot snapshot of paired Bluetooth Classic devices.
+fn selector(remembered: Option<&str>) -> windows::core::Result<HSTRING> {
+    let mut s = format!(
+        "({}) OR ({})",
+        BluetoothDevice::GetDeviceSelectorFromPairingState(true)?,
+        BluetoothDevice::GetDeviceSelectorFromConnectionStatus(
+            BluetoothConnectionStatus::Connected
+        )?
+    );
+    // ids end in the device address, `aa:bb:cc:dd:ee:ff`; checked before it goes into the query
+    if let Some(addr) = remembered.and_then(|id| id.rsplit('-').next())
+        && addr.len() == 17
+        && addr.chars().all(|c| c == ':' || c.is_ascii_hexdigit())
+    {
+        s += &format!(
+            " OR (System.Devices.Aep.ProtocolId:=\"{{E0CBF06C-CD8B-4647-BB8A-263B43F0F974}}\"              AND System.Devices.Aep.DeviceAddress:=\"{addr}\")"
+        );
+    }
+    Ok(HSTRING::from(s))
+}
+
+/// Device-id prefix for an adapter: `bluetooth#bluetooth<adapter mac>-`.
+#[cfg(windows)]
+fn prefix(a: &BluetoothAdapter) -> Option<String> {
+    let b = a.BluetoothAddress().ok()?.to_be_bytes();
+    let mac = b[2..]
+        .iter()
+        .map(|x| format!("{x:02x}"))
+        .collect::<Vec<_>>()
+        .join(":");
+    Some(format!("bluetooth#bluetooth{mac}-"))
+}
+
+/// Prefixes of every enabled adapter (more than one radio, or after one was swapped out).
+#[cfg(windows)]
+fn all_adapter_prefixes() -> Vec<String> {
+    let Ok(found) = BluetoothAdapter::GetDeviceSelector()
+        .and_then(|sel| DeviceInformation::FindAllAsyncAqsFilter(&sel))
+        .and_then(|op| op.join())
+    else {
+        return Vec::new();
+    };
+    found
+        .into_iter()
+        .filter_map(|i| {
+            prefix(
+                &BluetoothAdapter::FromIdAsync(&i.Id().ok()?)
+                    .ok()?
+                    .join()
+                    .ok()?,
+            )
+        })
+        .collect()
+}
+
+/// Whether a device sits on an adapter that's still there. Windows keeps pairings of removed adapters, which
+/// can't connect. Checks the default adapter first (what nearly everyone has) and only scans all adapters for a
+/// device from some other one: it is then either a second live radio (kept) or a removed one (dropped).
+/// Keeps the device whenever the adapters can't be read, so a failed query never hides a headset.
+#[cfg(windows)]
+fn on_live_adapter(id: &str) -> bool {
+    let id = id.to_ascii_lowercase();
+    let default = BluetoothAdapter::GetDefaultAsync()
+        .and_then(|op| op.join())
+        .ok()
+        .and_then(|a| prefix(&a));
+    if default.is_some_and(|p| id.starts_with(&p)) {
+        return true;
+    }
+    let all = all_adapter_prefixes();
+    all.is_empty() || all.iter().any(|p| id.starts_with(p))
+}
+
+#[cfg(windows)]
+/// One-shot snapshot of paired (or connected) Bluetooth Classic devices on live adapters.
 pub fn paired_devices() -> windows::core::Result<Vec<PairedDevice>> {
-    let selector = BluetoothDevice::GetDeviceSelectorFromPairingState(true)?;
     let found = DeviceInformation::FindAllAsyncWithKindAqsFilterAndAdditionalProperties(
-        &selector,
+        &selector(None)?,
         &additional_properties(),
         DeviceInformationKind::AssociationEndpoint,
     )?
     .join()?;
-    found.into_iter().map(|d| paired_from_info(&d)).collect()
+    found
+        .into_iter()
+        .map(|d| paired_from_info(&d))
+        .filter(|d| d.as_ref().map_or(true, |d| on_live_adapter(&d.id)))
+        .collect()
 }
 
 /// Live watcher over paired devices. Events arrive on the returned channel; dropping the watcher stops it.
@@ -98,11 +177,13 @@ pub struct Watcher {
 
 #[cfg(windows)]
 impl Watcher {
-    pub fn start() -> windows::core::Result<(Self, Receiver<DiscoveryEvent>)> {
+    /// `remembered`: id of the last headset used, listed even when Windows forgot it was paired.
+    pub fn start(
+        remembered: Option<&str>,
+    ) -> windows::core::Result<(Self, Receiver<DiscoveryEvent>)> {
         let (tx, rx) = unbounded();
-        let selector = BluetoothDevice::GetDeviceSelectorFromPairingState(true)?;
         let watcher = DeviceInformation::CreateWatcherWithKindAqsFilterAndAdditionalProperties(
-            &selector,
+            &selector(remembered)?,
             &additional_properties(),
             DeviceInformationKind::AssociationEndpoint,
         )?;
@@ -111,6 +192,8 @@ impl Watcher {
             move |_: Ref<DeviceWatcher>, info: Ref<DeviceInformation>| {
                 if let Some(info) = info.as_ref()
                     && let Ok(d) = paired_from_info(info)
+                    // re-queried per device so an adapter plugged in while running is picked up
+                    && on_live_adapter(&d.id)
                 {
                     let _ = t.send(DiscoveryEvent::Added(d));
                 }
@@ -256,7 +339,10 @@ mod bluez {
     use std::sync::Arc;
 
     impl Watcher {
-        pub fn start() -> Result<(Self, Receiver<DiscoveryEvent>), String> {
+        /// `_remembered` is a Windows workaround; BlueZ keeps paired state across adapters per device.
+        pub fn start(
+            _remembered: Option<&str>,
+        ) -> Result<(Self, Receiver<DiscoveryEvent>), String> {
             // fail fast when BlueZ/adapter is missing so the engine reports it once
             let first = rt().block_on(snapshot()).map_err(|e| e.to_string())?;
             let (tx, rx) = unbounded();

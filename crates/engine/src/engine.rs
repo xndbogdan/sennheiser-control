@@ -186,7 +186,7 @@ impl Actor {
             std::mem::forget(tx);
             return (None, rx);
         }
-        match bluetooth::Watcher::start() {
+        match bluetooth::Watcher::start(self.opts.preferred_device.as_deref()) {
             Ok((w, rx)) => (Some(w), rx),
             Err(e) => {
                 log::error!("device watcher failed: {e}");
